@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Acceso_UMAD_QRs.ViewModels"
+             x:Class="Acceso_UMAD_QRs.Views.RegistroView"
+             Title="Registro de Usuario">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="15" Padding="25">
+            
+            <Label Text="Crea tu cuenta" FontSize="24" FontAttributes="Bold" HorizontalOptions="Center"/>
+            <Label Text="Tus datos serán enviados a Administración para autorizar tu código QR." 
+                   FontSize="14" TextColor="Gray" HorizontalOptions="Center" HorizontalTextAlignment="Center" Margin="0,0,0,15"/>
+
+            <Entry Placeholder="Nombre Completo (Requerido)" Text="{Binding NombreCompleto}">
+                <Entry.Triggers>
+                    <DataTrigger TargetType="Entry" Binding="{Binding NombreCompleto}" Value="">
+                        <Setter Property="BackgroundColor" Value="#FADBD8" />
+                    </DataTrigger>
+                </Entry.Triggers>
+            </Entry>
+
+            <Entry Placeholder="Correo Electrónico (Requerido)" Text="{Binding Correo}" Keyboard="Email">
+                <Entry.Triggers>
+                    <DataTrigger TargetType="Entry" Binding="{Binding Correo}" Value="">
+                        <Setter Property="BackgroundColor" Value="#FADBD8" />
+                    </DataTrigger>
+                    <DataTrigger TargetType="Entry" Binding="{Binding EsCorreoInvalido}" Value="True">
+                        <Setter Property="TextColor" Value="Red" />
+                        <Setter Property="BackgroundColor" Value="#FCF3CF" />
+                    </DataTrigger>
+                </Entry.Triggers>
+            </Entry>
+            <Label Text="* El correo debe ser válido. Si eres estudiante o empleado, usa el dominio @umad.edu.mx o @madero.edu.mx" TextColor="Orange" FontSize="12" IsVisible="False">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding EsCorreoInvalido}" Value="True">
+                        <Setter Property="IsVisible" Value="True" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
+
+            <Entry Placeholder="Matrícula (Deja en blanco si eres invitado)" Text="{Binding Matricula}" Keyboard="Numeric">
+                <Entry.Triggers>
+                    <DataTrigger TargetType="Entry" Binding="{Binding Matricula}" Value="">
+                        <Setter Property="BackgroundColor" Value="#EAECEE" />
+                    </DataTrigger>
+                    <DataTrigger TargetType="Entry" Binding="{Binding EsMatriculaInvalida}" Value="True">
+                        <Setter Property="TextColor" Value="Red" />
+                        <Setter Property="BackgroundColor" Value="#FCF3CF" />
+                    </DataTrigger>
+                </Entry.Triggers>
+            </Entry>
+            <Label Text="* La matrícula debe tener exactamente 8 números" TextColor="Orange" FontSize="12" IsVisible="False">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding EsMatriculaInvalida}" Value="True">
+                        <Setter Property="IsVisible" Value="True" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
+
+            <Entry Placeholder="Contraseña" Text="{Binding Contrasena}" IsPassword="True">
+                <Entry.Triggers>
+                    <DataTrigger TargetType="Entry" Binding="{Binding Contrasena}" Value="">
+                        <Setter Property="BackgroundColor" Value="#FADBD8" />
+                    </DataTrigger>
+                    <DataTrigger TargetType="Entry" Binding="{Binding EsContrasenaInvalida}" Value="True">
+                        <Setter Property="TextColor" Value="Red" />
+                        <Setter Property="BackgroundColor" Value="#FCF3CF" />
+                    </DataTrigger>
+                </Entry.Triggers>
+            </Entry>
+            <Label Text="* La contraseña debe tener mínimo 8 caracteres, incluyendo mayúsculas, minúsculas, números y un carácter especial" TextColor="Orange" FontSize="12" IsVisible="False">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding EsContrasenaInvalida}" Value="True">
+                        <Setter Property="IsVisible" Value="True" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
+
+            <Picker Title="Selecciona tu Rol" 
+                    ItemsSource="{Binding Roles}" 
+                    ItemDisplayBinding="{Binding NombreRol}" 
+                    SelectedItem="{Binding Rol}" />
+
+            <Button Text="Crear Cuenta y Solicitar Acceso" Command="{Binding SaveUsuarioCommand}" BackgroundColor="#28B463" TextColor="White" Margin="0,20,0,0">
+                <Button.Triggers>
+                    <DataTrigger TargetType="Button" Binding="{Binding IsFormValid}" Value="False">
+                        <Setter Property="IsEnabled" Value="False" />
+                        <Setter Property="BackgroundColor" Value="Gray" />
+                    </DataTrigger>
+                </Button.Triggers>
+            </Button>
+            
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
