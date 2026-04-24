@@ -1,7 +1,7 @@
 ﻿using Android.App;
 using Android.Runtime;
 
-namespace Acces_UMAD_QRs
+namespace Acceso_UMAD_QRs
 {
     [Application]
     public class MainApplication : MauiApplication

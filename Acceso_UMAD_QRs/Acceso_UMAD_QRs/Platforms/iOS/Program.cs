@@ -1,7 +1,7 @@
 ﻿using ObjCRuntime;
 using UIKit;
 
-namespace Acces_UMAD_QRs
+namespace Acceso_UMAD_QRs
 {
     public class Program
     {

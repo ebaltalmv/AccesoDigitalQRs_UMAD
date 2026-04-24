@@ -1,6 +1,6 @@
 ﻿using Foundation;
 
-namespace Acces_UMAD_QRs
+namespace Acceso_UMAD_QRs
 {
     [Register("AppDelegate")]
     public class AppDelegate : MauiUIApplicationDelegate

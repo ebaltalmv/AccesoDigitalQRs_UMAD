@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="Acceso_UMAD_QRs/Acces_UMAD_QRs.csproj">
+  <Project Path="Acceso_UMAD_QRs/Acceso_UMAD_QRs.csproj">
     <Deploy Solution="Debug|*" />
   </Project>
   <Project Path="MigrationApp/MigrationApp.csproj" />

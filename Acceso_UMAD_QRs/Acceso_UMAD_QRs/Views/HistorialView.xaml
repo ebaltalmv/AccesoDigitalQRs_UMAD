@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:UMAD_QR.ViewModels"
              xmlns:models="clr-namespace:SharedResources.Models;assembly=SharedResources"
-             x:Class="Acces_UMAD_QRs.Views.HistorialView"
+             x:Class="Acceso_UMAD_QRs.Views.HistorialView"
              x:DataType="vm:RegistroViewModel"
              Title="Auditoría de Accesos">
 

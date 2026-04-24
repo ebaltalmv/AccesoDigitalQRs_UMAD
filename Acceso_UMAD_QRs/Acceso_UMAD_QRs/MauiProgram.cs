@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 
-namespace Acces_UMAD_QRs
+namespace Acceso_UMAD_QRs
 {
     public static class MauiProgram
     {

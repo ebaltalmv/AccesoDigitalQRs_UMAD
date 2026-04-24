@@ -1,4 +1,4 @@
-﻿namespace Acces_UMAD_QRs
+﻿namespace Acceso_UMAD_QRs
 {
     public partial class AppShell : Shell
     {
