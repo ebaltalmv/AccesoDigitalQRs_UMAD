@@ -89,6 +89,9 @@
 	  <MauiXaml Update="Views\EscanerView.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
+	  <MauiXaml Update="Views\GeneradorAccesoView.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
 	  <MauiXaml Update="Views\HistorialView.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>

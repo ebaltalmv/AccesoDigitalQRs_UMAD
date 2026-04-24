@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Acceso_UMAD_QRs.ViewModels"
+             x:Class="Acceso_UMAD_QRs.Views.EscanerView"
+             x:DataType="vm:RegistroViewModel"
+             xmlns:zxing="clr-namespace:ZXing.Net.Maui;assembly=ZXing.Net.Maui"
+             Title="Escanear Código QR">
+
+    <Grid RowDefinitions="Auto, *, Auto">
+
+        <Label Grid.Row="0"
+               Text="Punto de Acceso Activo"
+               HorizontalOptions="Center"
+               Margin="10"
+               FontAttributes="Bold"
+               TextColor="#003366" />
+
+        <Border Grid.Row="1"
+                Margin="20"
+                Padding="0"
+                StrokeShape="RoundRectangle 15">
+            <Border.Triggers>
+                <DataTrigger TargetType="Border"
+                             Binding="{Binding EstadoLectura}"
+                             Value="0">
+                    <Setter Property="BackgroundColor"
+                            Value="LightGray" />
+                </DataTrigger>
+                <DataTrigger TargetType="Border"
+                             Binding="{Binding EstadoLectura}"
+                             Value="1">
+                    <Setter Property="BackgroundColor"
+                            Value="#28B463" />
+                </DataTrigger>
+                <DataTrigger TargetType="Border"
+                             Binding="{Binding EstadoLectura}"
+                             Value="2">
+                    <Setter Property="BackgroundColor"
+                            Value="#E74C3C" />
+                </DataTrigger>
+            </Border.Triggers>
+
+            <Grid RowDefinitions="*, Auto">
+                <zxing:CameraBarcodeReaderView Grid.Row="0"
+                                               x:Name="barcodeReader"
+                                               BarcodesDetected="CameraBarcodeReaderView_BarcodesDetected"
+                                               IsDetecting="True"
+                                               Margin="10">
+                    <zxing:CameraBarcodeReaderView.Triggers>
+                        <DataTrigger TargetType="zxing:CameraBarcodeReaderView"
+                                     Binding="{Binding EstadoLectura}"
+                                     Value="1">
+                            <Setter Property="IsVisible"
+                                    Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="zxing:CameraBarcodeReaderView"
+                                     Binding="{Binding EstadoLectura}"
+                                     Value="2">
+                            <Setter Property="IsVisible"
+                                    Value="False" />
+                        </DataTrigger>
+                    </zxing:CameraBarcodeReaderView.Triggers>
+                </zxing:CameraBarcodeReaderView>
+
+                <Label Grid.Row="1"
+                       Text="{Binding MensajeResultado}"
+                       FontSize="18"
+                       HorizontalTextAlignment="Center"
+                       VerticalOptions="Center"
+                       Margin="20"
+                       FontAttributes="Bold"
+                       TextColor="White">
+                    <Label.Triggers>
+                        <DataTrigger TargetType="Label"
+                                     Binding="{Binding EstadoLectura}"
+                                     Value="0">
+                            <Setter Property="TextColor"
+                                    Value="Black" />
+                        </DataTrigger>
+                    </Label.Triggers>
+                </Label>
+            </Grid>
+        </Border>
+
+        <HorizontalStackLayout Grid.Row="2"
+                               HorizontalOptions="Center"
+                               Spacing="15"
+                               Margin="0,0,0,20">
+            <Button Text="Simular Éxito"
+                    Command="{Binding SimularAccesoValidoCommand}"
+                    BackgroundColor="#28B463"
+                    TextColor="White" />
+            <Button Text="Simular Fallo"
+                    Command="{Binding SimularAccesoInvalidoCommand}"
+                    BackgroundColor="#E74C3C"
+                    TextColor="White" />
+        </HorizontalStackLayout>
+
+    </Grid>
+</ContentPage>
