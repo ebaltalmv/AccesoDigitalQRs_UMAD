@@ -4,7 +4,7 @@
              xmlns:vm="clr-namespace:Acceso_UMAD_QRs.ViewModels"
              x:Class="Acceso_UMAD_QRs.Views.EscanerView"
              x:DataType="vm:RegistroViewModel"
-             xmlns:zxing="clr-namespace:ZXing.Net.Maui;assembly=ZXing.Net.Maui"
+             xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
              Title="Escanear Código QR">
 
     <Grid RowDefinitions="Auto, *, Auto">

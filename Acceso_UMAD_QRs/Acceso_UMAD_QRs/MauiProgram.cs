@@ -3,6 +3,7 @@ using Acceso_UMAD_QRs.Views;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SharedResources.Data;
+using ZXing.Net.Maui.Controls;
 
 namespace Acceso_UMAD_QRs
 {
@@ -13,6 +14,7 @@ namespace Acceso_UMAD_QRs
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseBarcodeReader()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
