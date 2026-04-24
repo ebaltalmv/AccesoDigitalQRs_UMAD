@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:UMAD_QR.ViewModels"
+             x:Class="Acces_UMAD_QRs.Views.LoginView"
+             x:DataType="vm:UsuarioViewModel"
+             Title="Acceso UMAD"
+             Shell.NavBarIsVisible="False">
+    <VerticalStackLayout Spacing="15" Padding="30" VerticalOptions="Center">
+
+        <Label Text="Sistema de Acceso UMAD" 
+               FontSize="24" 
+               HorizontalOptions="Center" 
+               FontAttributes="Bold"
+               Margin="0,0,0,20"/>
+
+        <Entry Placeholder="Correo institucional" Text="{Binding Correo}" Keyboard="Email">
+            <Entry.Triggers>
+                <DataTrigger TargetType="Entry" Binding="{Binding Correo}" Value="">
+                    <Setter Property="BackgroundColor" Value="#FADBD8" />
+                </DataTrigger>
+            </Entry.Triggers>
+        </Entry>
+
+        <Entry Placeholder="Contraseña o Matrícula" Text="{Binding Contrasena}" IsPassword="True">
+            <Entry.Triggers>
+                <DataTrigger TargetType="Entry" Binding="{Binding Contrasena}" Value="">
+                    <Setter Property="BackgroundColor" Value="#FADBD8" />
+                </DataTrigger>
+            </Entry.Triggers>
+        </Entry>
+
+        <Button Text="Iniciar Sesión" 
+                Command="{Binding IniciarSesionCommand}" 
+                BackgroundColor="#003366" 
+                TextColor="White"
+                Margin="0,10,0,0">
+            <Button.Triggers>
+                <MultiTrigger TargetType="Button">
+                    <MultiTrigger.Conditions>
+                        <BindingCondition Binding="{Binding Correo}" Value="" />
+                        <BindingCondition Binding="{Binding Contrasena}" Value="" />
+                    </MultiTrigger.Conditions>
+                    <Setter Property="IsEnabled" Value="False" />
+                    <Setter Property="BackgroundColor" Value="Gray" />
+                </MultiTrigger>
+                
+                <DataTrigger TargetType="Button" Binding="{Binding Correo}" Value="">
+                    <Setter Property="IsEnabled" Value="False" />
+                    <Setter Property="BackgroundColor" Value="Gray" />
+                </DataTrigger>
+                <DataTrigger TargetType="Button" Binding="{Binding Contrasena}" Value="">
+                    <Setter Property="IsEnabled" Value="False" />
+                    <Setter Property="BackgroundColor" Value="Gray" />
+                </DataTrigger>
+            </Button.Triggers>
+        </Button>
+
+        <BoxView HeightRequest="1" Color="LightGray" Margin="0,15"/>
+
+        <Label Text="¿Eres estudiante de nuevo ingreso o invitado?" 
+               HorizontalOptions="Center" 
+               FontSize="14" 
+               TextColor="Gray"/>
+
+        <Button Text="Solicitar Acceso (Registro)" 
+                Command="{Binding IrARegistroCommand}"
+                BackgroundColor="Transparent" 
+                TextColor="White"
+                FontAttributes="Bold"
+                MaximumWidthRequest="250"/>
+
+    </VerticalStackLayout>
+</ContentPage>
