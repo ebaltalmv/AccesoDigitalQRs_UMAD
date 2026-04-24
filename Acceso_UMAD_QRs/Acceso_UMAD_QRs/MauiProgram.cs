@@ -1,4 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Acceso_UMAD_QRs.ViewModels;
+using Acceso_UMAD_QRs.Views;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using SharedResources.Data;
 
 namespace Acceso_UMAD_QRs
 {
@@ -15,11 +19,37 @@ namespace Acceso_UMAD_QRs
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
+            string dbPath = Path.Combine(FileSystem.AppDataDirectory, "UmadLocal.db");
+
+            builder.Services.AddDbContext<UmadDbContext>(options =>
+                options.UseSqlite($"Filename={dbPath}"));
+
+            builder.Services.AddTransient<LoginView>();
+            builder.Services.AddTransient<RegistroView>();
+            builder.Services.AddTransient<MiQRView>();
+            builder.Services.AddTransient<SetupPuntoAccesoView>();
+            builder.Services.AddTransient<EscanerView>();
+            builder.Services.AddTransient<AprobacionesView>();
+            builder.Services.AddTransient<GeneradorAccesoView>();
+            builder.Services.AddTransient<HistorialView>();
+
+            builder.Services.AddTransient<UsuarioViewModel>();
+            builder.Services.AddTransient<RolViewModel>();
+            builder.Services.AddTransient<RegistroViewModel>();
+            builder.Services.AddTransient<TokenAccesoViewModel>();
+
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
 
-            return builder.Build();
+            var app = builder.Build();
+            using (var scope = app.Services.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<UmadDbContext>();
+                dbContext.Database.EnsureCreated();
+            }
+
+            return app;
         }
     }
 }
