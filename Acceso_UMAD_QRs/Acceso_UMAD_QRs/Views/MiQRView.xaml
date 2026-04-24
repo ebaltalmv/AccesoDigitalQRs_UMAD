@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:UMAD_QR.ViewModels"
+             x:Class="Acces_UMAD_QRs.Views.MiQRView"
+             x:DataType="vm:TokenAccesoViewModel"
+             xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+             Title="Mi Acceso UMAD">
+
+    <Grid Padding="30">
+        <VerticalStackLayout Spacing="20" VerticalOptions="Center" IsVisible="False">
+            <VerticalStackLayout.Triggers>
+                <DataTrigger TargetType="VerticalStackLayout" Binding="{Binding EsPendiente}" Value="True">
+                    <Setter Property="IsVisible" Value="True" />
+                </DataTrigger>
+            </VerticalStackLayout.Triggers>
+
+            <Image Source="waiting_icon.png" HeightRequest="100" HorizontalOptions="Center"/>
+            <Label Text="Cuenta en Revisión" FontSize="24" FontAttributes="Bold" HorizontalOptions="Center"/>
+            <Label Text="Tu solicitud está siendo procesada por el administrador. Te notificaremos cuando tu QR esté listo." 
+                   HorizontalOptions="Center" HorizontalTextAlignment="Center" TextColor="Gray"/>
+        </VerticalStackLayout>
+
+        <VerticalStackLayout Spacing="20" VerticalOptions="Center" IsVisible="False">
+            <VerticalStackLayout.Triggers>
+                <DataTrigger TargetType="VerticalStackLayout" Binding="{Binding EsPendiente}" Value="False">
+                    <Setter Property="IsVisible" Value="True" />
+                </DataTrigger>
+            </VerticalStackLayout.Triggers>
+
+            <Label Text="Tu Código de Acceso" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center"/>
+
+            <Border Padding="10" HorizontalOptions="Center" Stroke="LightGray">
+                <VerticalStackLayout>
+                    <zxing:BarcodeGeneratorView Format="QrCode"
+                                                Value="{Binding HashQr}"
+                                                WidthRequest="200"
+                                                HeightRequest="200"
+                                                Margin="10"
+                                                ForegroundColor="Black"
+                                                BackgroundColor="White">
+                        <zxing:BarcodeGeneratorView.Triggers>
+                            <DataTrigger TargetType="zxing:BarcodeGeneratorView" Binding="{Binding EsExpirado}" Value="True">
+                                <Setter Property="Opacity" Value="0.2" />
+                            </DataTrigger>
+                        </zxing:BarcodeGeneratorView.Triggers>
+                    </zxing:BarcodeGeneratorView>
+
+                    <Label Text="{Binding HashQr}" HorizontalOptions="Center" FontSize="10" Margin="0,5"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="5">
+                <Label Text="Vence el:"/>
+                <Label Text="{Binding FechaExpiracion, StringFormat='{0:dd/MM/yyyy HH:mm}'}" FontAttributes="Bold">
+                    <Label.Triggers>
+                        <DataTrigger TargetType="Label" Binding="{Binding EsExpirado}" Value="True">
+                            <Setter Property="TextColor" Value="Red" />
+                        </DataTrigger>
+                    </Label.Triggers>
+                </Label>
+            </HorizontalStackLayout>
+
+            <Button Text="Solicitar Renovación" 
+                    Command="{Binding SolicitarRenovacionCommand}"
+                    BackgroundColor="#003366" 
+                    TextColor="White"
+                    IsVisible="False">
+                <Button.Triggers>
+                    <DataTrigger TargetType="Button" Binding="{Binding EsExpirado}" Value="True">
+                        <Setter Property="IsVisible" Value="True" />
+                    </DataTrigger>
+                </Button.Triggers>
+            </Button>
+
+            <Border StrokeShape="RoundRectangle 20" Padding="10,5" HorizontalOptions="Center">
+                <Border.Triggers>
+                    <DataTrigger TargetType="Border" Binding="{Binding EsExpirado}" Value="True">
+                        <Setter Property="BackgroundColor" Value="#FADBD8" />
+                    </DataTrigger>
+                    <DataTrigger TargetType="Border" Binding="{Binding EsAprobado}" Value="True">
+                        <Setter Property="BackgroundColor" Value="#D4EFDF" />
+                    </DataTrigger>
+                </Border.Triggers>
+                <Label Text="Token Activo" TextColor="Green">
+                    <Label.Triggers>
+                        <DataTrigger TargetType="Label" Binding="{Binding EsExpirado}" Value="True">
+                            <Setter Property="Text" Value="Token Expirado" />
+                            <Setter Property="TextColor" Value="Red" />
+                        </DataTrigger>
+                    </Label.Triggers>
+                </Label>
+            </Border>
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
