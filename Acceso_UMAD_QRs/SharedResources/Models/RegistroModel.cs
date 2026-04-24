@@ -1,6 +1,6 @@
 namespace SharedResources.Models;
 
-public class Registro
+public class RegistroModel
 {
     public int IdRegistro { get; set; }
 
@@ -10,5 +10,5 @@ public class Registro
 
     public DateTime FechaHora { get; set; }
 
-    public Usuario Usuario { get; set; } = null!;
+    public UsuarioModel Usuario { get; set; } = null!;
 }

@@ -9,35 +9,71 @@
 
     <Grid RowDefinitions="Auto, *">
 
-        <VerticalStackLayout Grid.Row="0" Padding="15" Spacing="10" BackgroundColor="#F8F9F9">
-            <Label Text="Bitácora de Seguridad" FontSize="22" FontAttributes="Bold" TextColor="#003366"/>
+        <VerticalStackLayout Grid.Row="0"
+                             Padding="15"
+                             Spacing="10"
+                             BackgroundColor="#F8F9F9">
+            <Label Text="Bitácora de Seguridad"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   TextColor="#003366" />
 
             <HorizontalStackLayout Spacing="10">
-                <SearchBar Placeholder="Buscar nombre o matrícula..." WidthRequest="250" />
-                <Button Text="Filtrar" BackgroundColor="#003366" TextColor="White" Padding="10,0"/>
+                <SearchBar Placeholder="Buscar nombre o matrícula..."
+                           WidthRequest="250" />
+                <Button Text="Filtrar"
+                        BackgroundColor="#003366"
+                        TextColor="White"
+                        Padding="10,0" />
             </HorizontalStackLayout>
         </VerticalStackLayout>
 
-        <CollectionView Grid.Row="1" ItemsSource="{Binding Registros}" Margin="10,10,10,0">
+        <CollectionView Grid.Row="1"
+                        ItemsSource="{Binding Registros}"
+                        Margin="10,10,10,0">
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="models:Registro">
-                    <Border Margin="0,0,0,10" 
-                            Padding="10" 
-                            Stroke="LightGray" 
+                <DataTemplate x:DataType="models:RegistroModel">
+                    <Border Margin="0,0,0,10"
+                            Padding="10"
+                            Stroke="LightGray"
                             StrokeThickness="1"
                             StrokeShape="RoundRectangle 8">
 
-                        <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto">
+                        <Grid ColumnDefinitions="Auto, *, Auto"
+                              RowDefinitions="Auto, Auto">
 
-                            <BoxView Grid.RowSpan="2" Grid.Column="0" WidthRequest="6" Margin="0,0,15,0" CornerRadius="3" Color="#28B463">
+                            <BoxView Grid.RowSpan="2"
+                                     Grid.Column="0"
+                                     WidthRequest="6"
+                                     Margin="0,0,15,0"
+                                     CornerRadius="3"
+                                     Color="#28B463">
                             </BoxView>
 
-                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding Usuario.NombreCompleto}" FontAttributes="Bold" FontSize="16"/>
-                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding Usuario.Matricula}" TextColor="Gray" FontSize="12"/>
+                            <Label Grid.Row="0"
+                                   Grid.Column="1"
+                                   Text="{Binding Usuario.NombreCompleto}"
+                                   FontAttributes="Bold"
+                                   FontSize="16" />
+                            <Label Grid.Row="1"
+                                   Grid.Column="1"
+                                   Text="{Binding Usuario.Matricula}"
+                                   TextColor="Gray"
+                                   FontSize="12" />
 
-                            <VerticalStackLayout Grid.RowSpan="2" Grid.Column="2" HorizontalOptions="End" VerticalOptions="Center">
-                                <Label Text="{Binding PuntoAcceso}" FontSize="12" FontAttributes="Bold" HorizontalOptions="End" TextColor="#003366"/>
-                                <Label Text="{Binding FechaHora, StringFormat='{0:HH:mm hrs - dd/MM}'}" FontSize="12" TextColor="Gray" HorizontalOptions="End"/>
+                            <VerticalStackLayout Grid.RowSpan="2"
+                                                 Grid.Column="2"
+                                                 HorizontalOptions="End"
+                                                 VerticalOptions="Center">
+                                <Label Text="{Binding PuntoAcceso}"
+                                       FontSize="12"
+                                       FontAttributes="Bold"
+                                       HorizontalOptions="End"
+                                       TextColor="#003366" />
+                                <Label Text="{Binding FechaHora, StringFormat='{0:HH:mm hrs - dd/MM}'}"
+                                       FontSize="12"
+                                       TextColor="Gray"
+                                       HorizontalOptions="End" />
                             </VerticalStackLayout>
 
                         </Grid>

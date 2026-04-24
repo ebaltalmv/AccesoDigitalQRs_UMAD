@@ -5,7 +5,7 @@ namespace Acceso_UMAD_QRs
 {
     public partial class App : Application
     {
-        public static Usuario? UsuarioActual { get; set; }
+        public static UsuarioModel? UsuarioActual { get; set; }
 
         public App()
         {

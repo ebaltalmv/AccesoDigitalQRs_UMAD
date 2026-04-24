@@ -9,7 +9,7 @@ public partial class RegistroView : ContentPage
     public RegistroView(UsuarioViewModel viewModel)
     {
         InitializeComponent();
-        
+
         _viewModel = viewModel;
         BindingContext = _viewModel;
     }

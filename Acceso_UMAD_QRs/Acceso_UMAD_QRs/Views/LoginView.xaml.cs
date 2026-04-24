@@ -8,7 +8,6 @@ public partial class LoginView : ContentPage
     {
         InitializeComponent();
 
-        // Conectamos la Vista con UsuarioViewModel para la autenticaci�n
         BindingContext = viewModel;
     }
 }

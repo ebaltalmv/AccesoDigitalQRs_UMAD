@@ -6,25 +6,38 @@
              x:DataType="vm:RegistroViewModel"
              Title="Configuración de Acceso">
 
-    <VerticalStackLayout Spacing="20" Padding="30" VerticalOptions="Center">
-        <Image Source="guard_icon.png" HeightRequest="80" HorizontalOptions="Center"/>
-        <Label Text="Configuración de Turno" FontSize="24" FontAttributes="Bold" HorizontalOptions="Center"/>
-        <Label Text="Selecciona tu ubicación actual antes de comenzar a escanear códigos." 
-               HorizontalOptions="Center" HorizontalTextAlignment="Center" TextColor="Gray"/>
+    <VerticalStackLayout Spacing="20"
+                         Padding="30"
+                         VerticalOptions="Center">
+        <Image Source="guard_icon.png"
+               HeightRequest="80"
+               HorizontalOptions="Center" />
+        <Label Text="Configuración de Turno"
+               FontSize="24"
+               FontAttributes="Bold"
+               HorizontalOptions="Center" />
+        <Label Text="Selecciona tu ubicación actual antes de comenzar a escanear códigos."
+               HorizontalOptions="Center"
+               HorizontalTextAlignment="Center"
+               TextColor="Gray" />
 
-        <Picker Title="Selecciona el Punto de Acceso" 
-                ItemsSource="{Binding PuntosDeAcceso}" 
+        <Picker Title="Selecciona el Punto de Acceso"
+                ItemsSource="{Binding PuntosDeAcceso}"
                 SelectedItem="{Binding PuntoSeleccionado}"
-                Margin="0,15,0,0"/>
+                Margin="0,15,0,0" />
 
-        <Button Text="Abrir Escáner" 
+        <Button Text="Abrir Escáner"
                 Command="{Binding IniciarTurnoCommand}"
-                BackgroundColor="#003366" 
+                BackgroundColor="#003366"
                 TextColor="White">
             <Button.Triggers>
-                <DataTrigger TargetType="Button" Binding="{Binding PuntoSeleccionado}" Value="{x:Null}">
-                    <Setter Property="IsEnabled" Value="False" />
-                    <Setter Property="BackgroundColor" Value="Gray" />
+                <DataTrigger TargetType="Button"
+                             Binding="{Binding PuntoSeleccionado}"
+                             Value="{x:Null}">
+                    <Setter Property="IsEnabled"
+                            Value="False" />
+                    <Setter Property="BackgroundColor"
+                            Value="Gray" />
                 </DataTrigger>
             </Button.Triggers>
         </Button>

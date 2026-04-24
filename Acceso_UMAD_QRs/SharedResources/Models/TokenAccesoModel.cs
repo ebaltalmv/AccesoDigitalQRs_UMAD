@@ -1,6 +1,6 @@
 namespace SharedResources.Models;
 
-public class TokenAcceso
+public class TokenAccesoModel
 {
     public int IdToken { get; set; }
 
@@ -12,5 +12,5 @@ public class TokenAcceso
 
     public bool Activo { get; set; }
 
-    public Usuario Usuario { get; set; } = null!;
+    public UsuarioModel Usuario { get; set; } = null!;
 }

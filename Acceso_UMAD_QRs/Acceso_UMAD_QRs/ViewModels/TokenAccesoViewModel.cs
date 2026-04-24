@@ -11,10 +11,10 @@ namespace Acceso_UMAD_QRs.ViewModels
     public partial class TokenAccesoViewModel : ObservableObject
     {
         [ObservableProperty]
-        private ObservableCollection<TokenAcceso> _tokens;
+        private ObservableCollection<TokenAccesoModel> _tokens;
 
         [ObservableProperty]
-        private ObservableCollection<Usuario> _usuarios;
+        private ObservableCollection<UsuarioModel> _usuarios;
 
         [ObservableProperty]
         private string _hashQr = string.Empty;
@@ -29,7 +29,7 @@ namespace Acceso_UMAD_QRs.ViewModels
         private int _diasVigencia = 1;
 
         [ObservableProperty]
-        private Usuario _usuario = null!;
+        private UsuarioModel _usuario = null!;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsFormValid))]
@@ -37,7 +37,6 @@ namespace Acceso_UMAD_QRs.ViewModels
 
         public bool IsFormValid => IsHashValid && Usuario != null;
 
-        // --- Propiedades para "Mi QR" ---
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(EsAprobado))]
         [NotifyPropertyChangedFor(nameof(EsPendiente))]
@@ -48,18 +47,17 @@ namespace Acceso_UMAD_QRs.ViewModels
         public bool EsPendiente => EstadoUsuario == "Pendiente";
         public bool EsExpirado => EstadoUsuario == "Expirado";
 
-        // --- Propiedades para "Aprobaciones" ---
-        // Lista de usuarios sin token activo
         [ObservableProperty]
-        private ObservableCollection<Usuario> _solicitudesPendientes;
+        private ObservableCollection<UsuarioModel> _solicitudesPendientes;
 
         private readonly UmadDbContext _dataContext;
 
+
         public TokenAccesoViewModel(UmadDbContext dataContext)
         {
-            Tokens = new ObservableCollection<TokenAcceso>();
-            Usuarios = new ObservableCollection<Usuario>();
-            SolicitudesPendientes = new ObservableCollection<Usuario>();
+            Tokens = new ObservableCollection<TokenAccesoModel>();
+            Usuarios = new ObservableCollection<UsuarioModel>();
+            SolicitudesPendientes = new ObservableCollection<UsuarioModel>();
             _dataContext = dataContext;
         }
 
@@ -101,7 +99,7 @@ namespace Acceso_UMAD_QRs.ViewModels
 
         private async Task CreateToken()
         {
-            TokenAcceso token = new()
+            TokenAccesoModel token = new()
             {
                 HashQr = this.HashQr,
                 FechaExpiracion = this.FechaExpiracion,
@@ -113,7 +111,7 @@ namespace Acceso_UMAD_QRs.ViewModels
             await _dataContext.SaveChangesAsync();
         }
 
-        private async Task EditToken(TokenAcceso foundToken)
+        private async Task EditToken(TokenAccesoModel foundToken)
         {
             foundToken.HashQr = this.HashQr;
             foundToken.FechaExpiracion = this.FechaExpiracion;
@@ -124,7 +122,7 @@ namespace Acceso_UMAD_QRs.ViewModels
             await _dataContext.SaveChangesAsync();
         }
 
-        public void LoadTokenForEdition(TokenAcceso token)
+        public void LoadTokenForEdition(TokenAccesoModel token)
         {
             this.HashQr = token.HashQr;
             this.FechaExpiracion = token.FechaExpiracion;
@@ -139,18 +137,18 @@ namespace Acceso_UMAD_QRs.ViewModels
         }
 
         [RelayCommand]
-        public async Task GoToEditPage(TokenAcceso token)
+        public async Task GoToEditPage(TokenAccesoModel token)
         {
             await Shell.Current.GoToAsync("AddTokenAccesoPage", new Dictionary<string, object> { ["TokenAcceso"] = token });
         }
 
         [RelayCommand]
-        public async Task DeleteToken(TokenAcceso token)
+        public async Task DeleteToken(TokenAccesoModel token)
         {
             string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estas seguro de que quieres eliminar este token?", "Cancelar", "Eliminar");
             if (userAnswer == "Cancelar") return;
 
-            var tracked = _dataContext.ChangeTracker.Entries<TokenAcceso>()
+            var tracked = _dataContext.ChangeTracker.Entries<TokenAccesoModel>()
                             .FirstOrDefault(e => e.Entity.IdToken == token.IdToken)?.Entity;
 
             var entityToDelete = tracked ?? await _dataContext.TokensAcceso.FindAsync(token.IdToken);
@@ -163,7 +161,7 @@ namespace Acceso_UMAD_QRs.ViewModels
             }
         }
 
-        public async Task Initialize(TokenAcceso token)
+        public async Task Initialize(TokenAccesoModel token)
         {
             await GetUsuariosAsync();
             await GetTokensAsync();
@@ -197,7 +195,6 @@ namespace Acceso_UMAD_QRs.ViewModels
         public async Task CargarSolicitudesPendientes()
         {
             SolicitudesPendientes.Clear();
-            // Buscar usuarios que no tienen tokens activos
             var usuariosSinToken = await _dataContext.Usuarios
                 .Include(u => u.Rol)
                 .Where(u => !u.Tokens.Any(t => t.Activo && t.FechaExpiracion > DateTime.Now))
@@ -211,7 +208,7 @@ namespace Acceso_UMAD_QRs.ViewModels
         }
 
         [RelayCommand]
-        private async Task IrAGenerarToken(Usuario user)
+        private async Task IrAGenerarToken(UsuarioModel user)
         {
             await Shell.Current.GoToAsync(nameof(Views.GeneradorAccesoView), new Dictionary<string, object>
             {
@@ -234,9 +231,7 @@ namespace Acceso_UMAD_QRs.ViewModels
                 return;
             }
 
-            this.HashQr = Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper(); // Hash aleatorio
-
-            // Si son 0 días, asumimos Permanente (ej. 10 años)
+            this.HashQr = Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper();
             this.FechaExpiracion = DiasVigencia > 0 ? DateTime.Now.AddDays(DiasVigencia) : DateTime.Now.AddYears(10);
             this.Activo = true;
 
@@ -244,7 +239,6 @@ namespace Acceso_UMAD_QRs.ViewModels
 
             await Shell.Current.DisplayAlertAsync("Éxito", $"El Token fue generado y asignado con éxito a {Usuario.NombreCompleto}.", "OK");
 
-            // Refrescar lista de aprobaciones y regresar
             await CargarSolicitudesPendientes();
             await Shell.Current.GoToAsync("..");
         }
