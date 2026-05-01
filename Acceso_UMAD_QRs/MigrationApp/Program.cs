@@ -1,4 +1,1 @@
-﻿static void Main(string[] args)
-{
-
-}
+Console.WriteLine("Migration App");

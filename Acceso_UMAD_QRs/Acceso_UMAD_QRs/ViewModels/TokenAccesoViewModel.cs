@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using SharedResources.Data;
@@ -63,18 +63,32 @@ namespace Acceso_UMAD_QRs.ViewModels
 
         public async Task GetTokensAsync()
         {
-            Tokens.Clear();
-            var tokensFromDb = await _dataContext.TokensAcceso.Include(t => t.Usuario).AsNoTracking().ToListAsync();
-            foreach (var token in tokensFromDb)
+            try
             {
-                Tokens.Add(token);
+                Tokens.Clear();
+                var tokensFromDb = await _dataContext.TokensAcceso.Include(t => t.Usuario).AsNoTracking().ToListAsync();
+                foreach (var token in tokensFromDb)
+                {
+                    Tokens.Add(token);
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los tokens: {ex.Message}", "OK");
             }
         }
 
         public async Task GetUsuariosAsync()
         {
-            Usuarios.Clear();
-            Usuarios = new(await _dataContext.Usuarios.AsNoTracking().ToListAsync());
+            try
+            {
+                Usuarios.Clear();
+                Usuarios = new(await _dataContext.Usuarios.AsNoTracking().ToListAsync());
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los usuarios: {ex.Message}", "OK");
+            }
         }
 
         partial void OnHashQrChanged(string value)
@@ -85,41 +99,62 @@ namespace Acceso_UMAD_QRs.ViewModels
         [RelayCommand]
         public async Task SaveToken()
         {
-            var foundToken = await _dataContext.TokensAcceso.AsNoTracking().SingleOrDefaultAsync(t => t.HashQr == this.HashQr);
-            if (foundToken != null)
+            try
             {
-                await EditToken(foundToken);
-                await Shell.Current.DisplayAlertAsync("Exito en la edición", "El registro se ha editado exitosamente", "OK");
+                var foundToken = await _dataContext.TokensAcceso.AsNoTracking().SingleOrDefaultAsync(t => t.HashQr == this.HashQr);
+                if (foundToken != null)
+                {
+                    await EditToken(foundToken);
+                    await Shell.Current.DisplayAlertAsync("Exito en la edición", "El registro se ha editado exitosamente", "OK");
+                    await Shell.Current.GoToAsync("..");
+                    return;
+                }
+                await CreateToken();
                 await Shell.Current.GoToAsync("..");
-                return;
             }
-            await CreateToken();
-            await Shell.Current.GoToAsync("..");
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo guardar el token: {ex.Message}", "OK");
+            }
         }
 
         private async Task CreateToken()
         {
-            TokenAccesoModel token = new()
+            try
             {
-                HashQr = this.HashQr,
-                FechaExpiracion = this.FechaExpiracion,
-                Activo = this.Activo,
-                IdUsuario = this.Usuario.IdUsuario
-            };
+                TokenAccesoModel token = new()
+                {
+                    HashQr = this.HashQr,
+                    FechaExpiracion = this.FechaExpiracion,
+                    Activo = this.Activo,
+                    IdUsuario = this.Usuario.IdUsuario
+                };
 
-            await _dataContext.TokensAcceso.AddAsync(token);
-            await _dataContext.SaveChangesAsync();
+                await _dataContext.TokensAcceso.AddAsync(token);
+                await _dataContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo crear el token: {ex.Message}", "OK");
+            }
         }
 
         private async Task EditToken(TokenAccesoModel foundToken)
         {
-            foundToken.HashQr = this.HashQr;
-            foundToken.FechaExpiracion = this.FechaExpiracion;
-            foundToken.Activo = this.Activo;
-            foundToken.IdUsuario = this.Usuario.IdUsuario;
+            try
+            {
+                foundToken.HashQr = this.HashQr;
+                foundToken.FechaExpiracion = this.FechaExpiracion;
+                foundToken.Activo = this.Activo;
+                foundToken.IdUsuario = this.Usuario.IdUsuario;
 
-            _dataContext.TokensAcceso.Update(foundToken);
-            await _dataContext.SaveChangesAsync();
+                _dataContext.TokensAcceso.Update(foundToken);
+                await _dataContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo editar el token: {ex.Message}", "OK");
+            }
         }
 
         public void LoadTokenForEdition(TokenAccesoModel token)
@@ -148,16 +183,23 @@ namespace Acceso_UMAD_QRs.ViewModels
             string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estas seguro de que quieres eliminar este token?", "Cancelar", "Eliminar");
             if (userAnswer == "Cancelar") return;
 
-            var tracked = _dataContext.ChangeTracker.Entries<TokenAccesoModel>()
-                            .FirstOrDefault(e => e.Entity.IdToken == token.IdToken)?.Entity;
-
-            var entityToDelete = tracked ?? await _dataContext.TokensAcceso.FindAsync(token.IdToken);
-
-            if (entityToDelete != null)
+            try
             {
-                _dataContext.TokensAcceso.Remove(entityToDelete);
-                await _dataContext.SaveChangesAsync();
-                Tokens = new(await _dataContext.TokensAcceso.Include(t => t.Usuario).AsNoTracking().ToListAsync());
+                var tracked = _dataContext.ChangeTracker.Entries<TokenAccesoModel>()
+                                .FirstOrDefault(e => e.Entity.IdToken == token.IdToken)?.Entity;
+
+                var entityToDelete = tracked ?? await _dataContext.TokensAcceso.FindAsync(token.IdToken);
+
+                if (entityToDelete != null)
+                {
+                    _dataContext.TokensAcceso.Remove(entityToDelete);
+                    await _dataContext.SaveChangesAsync();
+                    Tokens = new(await _dataContext.TokensAcceso.Include(t => t.Usuario).AsNoTracking().ToListAsync());
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo eliminar el token: {ex.Message}", "OK");
             }
         }
 
@@ -194,16 +236,23 @@ namespace Acceso_UMAD_QRs.ViewModels
 
         public async Task CargarSolicitudesPendientes()
         {
-            SolicitudesPendientes.Clear();
-            var usuariosSinToken = await _dataContext.Usuarios
-                .Include(u => u.Rol)
-                .Where(u => !u.Tokens.Any(t => t.Activo && t.FechaExpiracion > DateTime.Now))
-                .AsNoTracking()
-                .ToListAsync();
-
-            foreach (var u in usuariosSinToken)
+            try
             {
-                SolicitudesPendientes.Add(u);
+                SolicitudesPendientes.Clear();
+                var usuariosSinToken = await _dataContext.Usuarios
+                    .Include(u => u.Rol)
+                    .Where(u => !u.Tokens.Any(t => t.Activo && t.FechaExpiracion > DateTime.Now))
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                foreach (var u in usuariosSinToken)
+                {
+                    SolicitudesPendientes.Add(u);
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron cargar las solicitudes: {ex.Message}", "OK");
             }
         }
 

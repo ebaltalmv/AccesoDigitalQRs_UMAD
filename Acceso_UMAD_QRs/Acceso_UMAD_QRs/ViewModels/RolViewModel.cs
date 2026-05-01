@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using SharedResources.Data;
@@ -41,11 +41,18 @@ namespace Acceso_UMAD_QRs.ViewModels
         /// <returns>Una tarea que representa la operación asíncrona.</returns>
         public async Task GetRolesAsync()
         {
-            Roles.Clear();
-            var rolesFromDb = await _dataContext.Roles.AsNoTracking().ToListAsync();
-            foreach (var rol in rolesFromDb)
+            try
             {
-                Roles.Add(rol);
+                Roles.Clear();
+                var rolesFromDb = await _dataContext.Roles.AsNoTracking().ToListAsync();
+                foreach (var rol in rolesFromDb)
+                {
+                    Roles.Add(rol);
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los roles: {ex.Message}", "OK");
             }
         }
 
@@ -79,16 +86,23 @@ namespace Acceso_UMAD_QRs.ViewModels
         [RelayCommand]
         public async Task SaveRol()
         {
-            var foundRol = await _dataContext.Roles.AsNoTracking().SingleOrDefaultAsync(r => r.NombreRol == this.NombreRol);
-            if (foundRol != null)
+            try
             {
-                await EditRol(foundRol);
-                await Shell.Current.DisplayAlertAsync("Exito en la edición", "El registro se ha editado exitosamente", "OK");
+                var foundRol = await _dataContext.Roles.AsNoTracking().SingleOrDefaultAsync(r => r.NombreRol == this.NombreRol);
+                if (foundRol != null)
+                {
+                    await EditRol(foundRol);
+                    await Shell.Current.DisplayAlertAsync("Exito en la edición", "El registro se ha editado exitosamente", "OK");
+                    await Shell.Current.GoToAsync("..");
+                    return;
+                }
+                await CreateRol();
                 await Shell.Current.GoToAsync("..");
-                return;
             }
-            await CreateRol();
-            await Shell.Current.GoToAsync("..");
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo guardar el rol: {ex.Message}", "OK");
+            }
         }
 
         /// <summary>
@@ -99,13 +113,20 @@ namespace Acceso_UMAD_QRs.ViewModels
         /// <returns>Una tarea que representa la operación asíncrona.</returns>
         private async Task CreateRol()
         {
-            RolModel rol = new()
+            try
             {
-                NombreRol = this.NombreRol
-            };
+                RolModel rol = new()
+                {
+                    NombreRol = this.NombreRol
+                };
 
-            await _dataContext.Roles.AddAsync(rol);
-            await _dataContext.SaveChangesAsync();
+                await _dataContext.Roles.AddAsync(rol);
+                await _dataContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo crear el rol: {ex.Message}", "OK");
+            }
         }
 
         /// <summary>
@@ -115,10 +136,17 @@ namespace Acceso_UMAD_QRs.ViewModels
         /// <returns>Una tarea que representa la operación de guardado asíncrono.</returns>
         private async Task EditRol(RolModel foundRol)
         {
-            foundRol.NombreRol = this.NombreRol;
+            try
+            {
+                foundRol.NombreRol = this.NombreRol;
 
-            _dataContext.Roles.Update(foundRol);
-            await _dataContext.SaveChangesAsync();
+                _dataContext.Roles.Update(foundRol);
+                await _dataContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo editar el rol: {ex.Message}", "OK");
+            }
         }
 
         /// <summary>
@@ -149,16 +177,23 @@ namespace Acceso_UMAD_QRs.ViewModels
             string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estas seguro de que quieres eliminar este rol?", "Cancelar", "Eliminar");
             if (userAnswer == "Cancelar") return;
 
-            var tracked = _dataContext.ChangeTracker.Entries<RolModel>()
-                            .FirstOrDefault(e => e.Entity.IdRol == rol.IdRol)?.Entity;
-
-            var entityToDelete = tracked ?? await _dataContext.Roles.FindAsync(rol.IdRol);
-
-            if (entityToDelete != null)
+            try
             {
-                _dataContext.Roles.Remove(entityToDelete);
-                await _dataContext.SaveChangesAsync();
-                Roles = new(await _dataContext.Roles.AsNoTracking().ToListAsync());
+                var tracked = _dataContext.ChangeTracker.Entries<RolModel>()
+                                .FirstOrDefault(e => e.Entity.IdRol == rol.IdRol)?.Entity;
+
+                var entityToDelete = tracked ?? await _dataContext.Roles.FindAsync(rol.IdRol);
+
+                if (entityToDelete != null)
+                {
+                    _dataContext.Roles.Remove(entityToDelete);
+                    await _dataContext.SaveChangesAsync();
+                    Roles = new(await _dataContext.Roles.AsNoTracking().ToListAsync());
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo eliminar el rol: {ex.Message}", "OK");
             }
         }
 

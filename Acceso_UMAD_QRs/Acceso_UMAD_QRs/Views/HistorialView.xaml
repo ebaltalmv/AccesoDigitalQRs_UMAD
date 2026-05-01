@@ -18,14 +18,23 @@
                    FontAttributes="Bold"
                    TextColor="#003366" />
 
-            <HorizontalStackLayout Spacing="10">
-                <SearchBar Placeholder="Buscar nombre o matrícula..."
-                           WidthRequest="250" />
-                <Button Text="Filtrar"
+            <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" RowSpacing="10" ColumnSpacing="10">
+                <SearchBar Grid.Row="0" Grid.ColumnSpan="2"
+                           Placeholder="Buscar nombre o matrícula..."
+                           Text="{Binding FiltroBusqueda}" />
+                           
+                <Picker Grid.Row="1" Grid.Column="0"
+                        Title="Todas las locaciones"
+                        ItemsSource="{Binding FiltrosPuntoAcceso}"
+                        SelectedItem="{Binding FiltroLocacion}" />
+                        
+                <Button Grid.Row="1" Grid.Column="1"
+                        Text="Filtrar"
+                        Command="{Binding FiltrarHistorialCommand}"
                         BackgroundColor="#003366"
                         TextColor="White"
                         Padding="10,0" />
-            </HorizontalStackLayout>
+            </Grid>
         </VerticalStackLayout>
 
         <CollectionView Grid.Row="1"

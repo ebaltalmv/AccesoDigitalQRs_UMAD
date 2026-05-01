@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using SharedResources.Data;
@@ -26,6 +26,15 @@ namespace Acceso_UMAD_QRs.ViewModels
 
         [ObservableProperty]
         private ObservableCollection<string> _puntosDeAcceso = new() { "Entrada Principal", "Estacionamiento Norte", "Edificio Central", "Biblioteca" };
+
+        [ObservableProperty]
+        private ObservableCollection<string> _filtrosPuntoAcceso = new() { "Todas las locaciones", "Entrada Principal", "Estacionamiento Norte", "Edificio Central", "Biblioteca" };
+
+        [ObservableProperty]
+        private string _filtroBusqueda = string.Empty;
+
+        [ObservableProperty]
+        private string _filtroLocacion = "Todas las locaciones";
 
         [ObservableProperty]
         private string _puntoSeleccionado;
@@ -56,6 +65,37 @@ namespace Acceso_UMAD_QRs.ViewModels
             _dataContext = dataContext;
         }
 
+        [RelayCommand]
+        public async Task FiltrarHistorial()
+        {
+            try
+            {
+                Registros.Clear();
+                var query = _dataContext.Registros.Include(r => r.Usuario).AsNoTracking().AsQueryable();
+
+                if (!string.IsNullOrWhiteSpace(FiltroBusqueda))
+                {
+                    var filtro = FiltroBusqueda.ToLower();
+                    query = query.Where(r => r.Usuario.NombreCompleto.ToLower().Contains(filtro) || (r.Usuario.Matricula != null && r.Usuario.Matricula.Contains(filtro)));
+                }
+
+                if (!string.IsNullOrEmpty(FiltroLocacion) && FiltroLocacion != "Todas las locaciones")
+                {
+                    query = query.Where(r => r.PuntoAcceso == FiltroLocacion);
+                }
+
+                var registrosFiltrados = await query.ToListAsync();
+                foreach (var registro in registrosFiltrados)
+                {
+                    Registros.Add(registro);
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudo filtrar el historial: {ex.Message}", "OK");
+            }
+        }
+
         /// <summary>
         /// Asíncronamente actualiza la colección de registros con los datos más recientes obtenidos de la base de
         /// datos.
@@ -65,11 +105,18 @@ namespace Acceso_UMAD_QRs.ViewModels
         /// <returns>Una tarea que representa la operación asincrónica.</returns>
         public async Task GetRegistrosAsync()
         {
-            Registros.Clear();
-            var registrosFromDb = await _dataContext.Registros.Include(r => r.Usuario).AsNoTracking().ToListAsync();
-            foreach (var registro in registrosFromDb)
+            try
             {
-                Registros.Add(registro);
+                Registros.Clear();
+                var registrosFromDb = await _dataContext.Registros.Include(r => r.Usuario).AsNoTracking().ToListAsync();
+                foreach (var registro in registrosFromDb)
+                {
+                    Registros.Add(registro);
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los registros: {ex.Message}", "OK");
             }
         }
 
@@ -81,8 +128,15 @@ namespace Acceso_UMAD_QRs.ViewModels
         /// <returns>Una tarea que representa la operación asíncrona.</returns>
         public async Task GetUsuariosAsync()
         {
-            Usuarios.Clear();
-            Usuarios = new(await _dataContext.Usuarios.AsNoTracking().ToListAsync());
+            try
+            {
+                Usuarios.Clear();
+                Usuarios = new(await _dataContext.Usuarios.AsNoTracking().ToListAsync());
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los usuarios: {ex.Message}", "OK");
+            }
         }
 
         /// <summary>
@@ -117,15 +171,22 @@ namespace Acceso_UMAD_QRs.ViewModels
         /// <returns>Una tarea que representa la operación asincrónica de creación del registro.</returns>
         private async Task CreateRegistro()
         {
-            RegistroModel registro = new()
+            try
             {
-                PuntoAcceso = this.PuntoAcceso,
-                FechaHora = this.FechaHora,
-                IdUsuario = this.Usuario.IdUsuario
-            };
+                RegistroModel registro = new()
+                {
+                    PuntoAcceso = this.PuntoAcceso,
+                    FechaHora = this.FechaHora,
+                    IdUsuario = this.Usuario.IdUsuario
+                };
 
-            await _dataContext.Registros.AddAsync(registro);
-            await _dataContext.SaveChangesAsync();
+                await _dataContext.Registros.AddAsync(registro);
+                await _dataContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo crear el registro: {ex.Message}", "OK");
+            }
         }
 
         /// <summary>
@@ -178,16 +239,23 @@ namespace Acceso_UMAD_QRs.ViewModels
             string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estas seguro de que quieres eliminar este registro?", "Cancelar", "Eliminar");
             if (userAnswer == "Cancelar") return;
 
-            var tracked = _dataContext.ChangeTracker.Entries<RegistroModel>()
-                            .FirstOrDefault(e => e.Entity.IdRegistro == registro.IdRegistro)?.Entity;
-
-            var entityToDelete = tracked ?? await _dataContext.Registros.FindAsync(registro.IdRegistro);
-
-            if (entityToDelete != null)
+            try
             {
-                _dataContext.Registros.Remove(entityToDelete);
-                await _dataContext.SaveChangesAsync();
-                Registros = new(await _dataContext.Registros.Include(r => r.Usuario).AsNoTracking().ToListAsync());
+                var tracked = _dataContext.ChangeTracker.Entries<RegistroModel>()
+                                .FirstOrDefault(e => e.Entity.IdRegistro == registro.IdRegistro)?.Entity;
+
+                var entityToDelete = tracked ?? await _dataContext.Registros.FindAsync(registro.IdRegistro);
+
+                if (entityToDelete != null)
+                {
+                    _dataContext.Registros.Remove(entityToDelete);
+                    await _dataContext.SaveChangesAsync();
+                    Registros = new(await _dataContext.Registros.Include(r => r.Usuario).AsNoTracking().ToListAsync());
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo eliminar el registro: {ex.Message}", "OK");
             }
         }
 
@@ -285,25 +353,34 @@ namespace Acceso_UMAD_QRs.ViewModels
         /// <returns>Una tarea que representa la operación asincrónica de procesamiento de la lectura del código QR.</returns>
         public async Task ProcesarLecturaQR(string hashQr)
         {
-            var token = await _dataContext.TokensAcceso
-                                          .Include(t => t.Usuario)
-                                          .FirstOrDefaultAsync(t => t.HashQr == hashQr);
-
-            if (token != null && token.Activo && token.FechaExpiracion > DateTime.Now)
+            try
             {
-                EstadoLectura = 1;
-                MensajeResultado = $"ACCESO PERMITIDO\n{token.Usuario.NombreCompleto}";
+                var token = await _dataContext.TokensAcceso
+                                              .Include(t => t.Usuario)
+                                              .FirstOrDefaultAsync(t => t.HashQr == hashQr);
 
-                this.Usuario = token.Usuario;
-                this.PuntoAcceso = Preferences.Default.Get("PuntoAccesoActual", "Entrada Desconocida");
-                this.FechaHora = DateTime.Now;
-                await CreateRegistro();
-                await GetRegistrosAsync();
+                if (token != null && token.Activo && token.FechaExpiracion > DateTime.Now)
+                {
+                    EstadoLectura = 1;
+                    MensajeResultado = $"ACCESO PERMITIDO\n{token.Usuario.NombreCompleto}";
+
+                    this.Usuario = token.Usuario;
+                    this.PuntoAcceso = Preferences.Default.Get("PuntoAccesoActual", "Entrada Desconocida");
+                    this.FechaHora = DateTime.Now;
+                    await CreateRegistro();
+                    await GetRegistrosAsync();
+                }
+                else
+                {
+                    EstadoLectura = 2;
+                    MensajeResultado = "ACCESO DENEGADO\nToken Expirado o Inválido.";
+                }
             }
-            else
+            catch (Exception ex)
             {
                 EstadoLectura = 2;
-                MensajeResultado = "ACCESO DENEGADO\nToken Expirado o Inválido.";
+                MensajeResultado = "ERROR DE CONEXIÓN\nVerifica la base de datos.";
+                Console.WriteLine(ex.Message);
             }
 
             await Task.Delay(3000);

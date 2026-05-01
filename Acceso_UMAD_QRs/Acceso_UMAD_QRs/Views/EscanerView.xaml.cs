@@ -23,7 +23,7 @@ public partial class EscanerView : ContentPage
         barcodeReader.IsDetecting = true;
     }
 
-    private void CameraBarcodeReaderView_BarcodesDetected(object sender, BarcodeDetectionEventArgs e)
+    private void CameraBarcodeReaderView_BarcodesDetected(object? sender, BarcodeDetectionEventArgs e)
     {
         if (e.Results != null && e.Results.Any())
         {

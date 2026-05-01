@@ -1,4 +1,4 @@
-﻿using Acceso_UMAD_QRs.Views;
+using Acceso_UMAD_QRs.Views;
 
 namespace Acceso_UMAD_QRs
 {
@@ -45,7 +45,7 @@ namespace Acceso_UMAD_QRs
             {
                 App.UsuarioActual = null;
                 var loginView = Application.Current!.Handler!.MauiContext!.Services.GetService<LoginView>();
-                Application.Current.MainPage = new NavigationPage(loginView);
+                Application.Current.Windows[0].Page = new NavigationPage(loginView);
             };
             this.Items.Add(logoutItem);
         }

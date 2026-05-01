@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using SharedResources.Data;
@@ -73,18 +73,34 @@ namespace Acceso_UMAD_QRs.ViewModels
 
         public async Task GetUsuariosAsync()
         {
-            Usuarios.Clear();
-            var usuariosFromDb = await _dataContext.Usuarios.Include(u => u.Rol).AsNoTracking().ToListAsync();
-            foreach (var usuario in usuariosFromDb)
+            try
             {
-                Usuarios.Add(usuario);
+                Usuarios.Clear();
+                var usuariosFromDb = await _dataContext.Usuarios.Include(u => u.Rol).AsNoTracking().ToListAsync();
+                foreach (var usuario in usuariosFromDb)
+                {
+                    Usuarios.Add(usuario);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (Application.Current?.Windows.Count > 0 && Application.Current.Windows[0].Page != null)
+                    await Application.Current.Windows[0].Page!.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los usuarios: {ex.Message}", "OK");
             }
         }
 
         public async Task GetRolesAsync()
         {
-            Roles.Clear();
-            Roles = new(await _dataContext.Roles.AsNoTracking().ToListAsync());
+            try
+            {
+                Roles.Clear();
+                Roles = new(await _dataContext.Roles.AsNoTracking().ToListAsync());
+            }
+            catch (Exception ex)
+            {
+                if (Application.Current?.Windows.Count > 0 && Application.Current.Windows[0].Page != null)
+                    await Application.Current.Windows[0].Page!.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los roles: {ex.Message}", "OK");
+            }
         }
 
         partial void OnNombreCompletoChanged(string value)
@@ -145,17 +161,24 @@ namespace Acceso_UMAD_QRs.ViewModels
         [RelayCommand]
         public async Task SaveUsuario()
         {
-            var foundUsuario = await _dataContext.Usuarios.AsNoTracking().SingleOrDefaultAsync(u => u.Correo == this.Correo);
-            if (foundUsuario != null)
+            try
             {
-                await EditUsuario(foundUsuario);
-                await App.Current!.MainPage!.DisplayAlert("Exito en la edición", "El registro se ha editado exitosamente", "OK");
-                await App.Current!.MainPage!.Navigation.PopAsync();
-                return;
+                var foundUsuario = await _dataContext.Usuarios.AsNoTracking().SingleOrDefaultAsync(u => u.Correo == this.Correo);
+                if (foundUsuario != null)
+                {
+                    await EditUsuario(foundUsuario);
+                    await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Exito en la edición", "El registro se ha editado exitosamente", "OK");
+                    await Application.Current!.Windows[0].Page!.Navigation.PopAsync();
+                    return;
+                }
+                await CreateUsuario();
+                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Éxito", "Usuario registrado exitosamente", "OK");
+                await Application.Current!.Windows[0].Page!.Navigation.PopAsync();
             }
-            await CreateUsuario();
-            await App.Current!.MainPage!.DisplayAlert("Éxito", "Usuario registrado exitosamente", "OK");
-            await App.Current!.MainPage!.Navigation.PopAsync();
+            catch (Exception ex)
+            {
+                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error de Base de Datos", $"No se pudo guardar el usuario: {ex.Message}", "OK");
+            }
         }
 
         private async Task CreateUsuario()
@@ -213,16 +236,23 @@ namespace Acceso_UMAD_QRs.ViewModels
             string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estas seguro de que quieres eliminar este usuario?", "Cancelar", "Eliminar");
             if (userAnswer == "Cancelar") return;
 
-            var tracked = _dataContext.ChangeTracker.Entries<UsuarioModel>()
-                            .FirstOrDefault(e => e.Entity.IdUsuario == usuario.IdUsuario)?.Entity;
-
-            var entityToDelete = tracked ?? await _dataContext.Usuarios.FindAsync(usuario.IdUsuario);
-
-            if (entityToDelete != null)
+            try
             {
-                _dataContext.Usuarios.Remove(entityToDelete);
-                await _dataContext.SaveChangesAsync();
-                Usuarios = new(await _dataContext.Usuarios.Include(u => u.Rol).AsNoTracking().ToListAsync());
+                var tracked = _dataContext.ChangeTracker.Entries<UsuarioModel>()
+                                .FirstOrDefault(e => e.Entity.IdUsuario == usuario.IdUsuario)?.Entity;
+
+                var entityToDelete = tracked ?? await _dataContext.Usuarios.FindAsync(usuario.IdUsuario);
+
+                if (entityToDelete != null)
+                {
+                    _dataContext.Usuarios.Remove(entityToDelete);
+                    await _dataContext.SaveChangesAsync();
+                    Usuarios = new(await _dataContext.Usuarios.Include(u => u.Rol).AsNoTracking().ToListAsync());
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo eliminar el usuario: {ex.Message}", "OK");
             }
         }
 
@@ -241,24 +271,31 @@ namespace Acceso_UMAD_QRs.ViewModels
         {
             if (string.IsNullOrWhiteSpace(Correo) || string.IsNullOrWhiteSpace(Contrasena))
             {
-                await App.Current!.MainPage!.DisplayAlert("Error", "Ingresa correo y contraseña", "OK");
+                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error", "Ingresa correo y contraseña", "OK");
                 return;
             }
 
-            var usuario = await _dataContext.Usuarios
-                .Include(u => u.Rol)
-                .AsNoTracking()
-                .SingleOrDefaultAsync(u => u.Correo == Correo && u.Contrasena == Contrasena);
-
-            if (usuario != null)
+            try
             {
-                App.UsuarioActual = usuario;
+                var usuario = await _dataContext.Usuarios
+                    .Include(u => u.Rol)
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(u => u.Correo == Correo && u.Contrasena == Contrasena);
 
-                App.Current!.MainPage = new AppShell();
+                if (usuario != null)
+                {
+                    App.UsuarioActual = usuario;
+
+                    Application.Current!.Windows[0].Page = new AppShell();
+                }
+                else
+                {
+                    await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error", "Credenciales incorrectas", "OK");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                await App.Current!.MainPage!.DisplayAlert("Error", "Credenciales incorrectas", "OK");
+                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error de Conexión", $"Problema al conectar con la base de datos: {ex.Message}", "OK");
             }
         }
 
@@ -266,7 +303,7 @@ namespace Acceso_UMAD_QRs.ViewModels
         public async Task IrARegistro()
         {
             var registroView = Application.Current!.Handler!.MauiContext!.Services.GetService<Views.RegistroView>();
-            await Application.Current.MainPage!.Navigation.PushAsync(registroView);
+            await Application.Current!.Windows[0].Page!.Navigation.PushAsync(registroView);
         }
     }
 }
