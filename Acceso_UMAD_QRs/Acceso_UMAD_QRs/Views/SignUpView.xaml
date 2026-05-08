@@ -2,63 +2,65 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:Acceso_UMAD_QRs.ViewModels"
-             x:Class="Acceso_UMAD_QRs.Views.RegistroView"
-             Title="Registro de Usuario">
+             x:Class="Acceso_UMAD_QRs.Views.SignUpView"
+             BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+             Title="User Registration">
 
     <ScrollView>
         <VerticalStackLayout Spacing="15"
                              Padding="25">
 
-            <Label Text="Crea tu cuenta"
+            <Label Text="Create your account"
                    FontSize="24"
                    FontAttributes="Bold"
+                   TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
                    HorizontalOptions="Center" />
-            <Label Text="Tus datos serán enviados a Administración para autorizar tu código QR."
+            <Label Text="Your data will be sent to Administration to authorize your QR code."
                    FontSize="14"
-                   TextColor="Gray"
+                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                    HorizontalOptions="Center"
                    HorizontalTextAlignment="Center"
                    Margin="0,0,0,15" />
 
-            <Entry Placeholder="Nombre Completo (Requerido)"
-                   Text="{Binding NombreCompleto}">
+            <Entry Placeholder="Full Name (Required)"
+                   Text="{Binding FullName}">
                 <Entry.Triggers>
                     <DataTrigger TargetType="Entry"
-                                 Binding="{Binding NombreCompleto}"
+                                 Binding="{Binding FullName}"
                                  Value="">
                         <Setter Property="BackgroundColor"
-                                Value="#FADBD8" />
+                                Value="{AppThemeBinding Light={StaticResource InputErrorLight}, Dark={StaticResource InputErrorDark}}" />
                     </DataTrigger>
                 </Entry.Triggers>
             </Entry>
 
-            <Entry Placeholder="Correo Electrónico (Requerido)"
-                   Text="{Binding Correo}"
+            <Entry Placeholder="Email Address (Required)"
+                   Text="{Binding Email}"
                    Keyboard="Email">
                 <Entry.Triggers>
                     <DataTrigger TargetType="Entry"
-                                 Binding="{Binding Correo}"
+                                 Binding="{Binding Email}"
                                  Value="">
                         <Setter Property="BackgroundColor"
-                                Value="#FADBD8" />
+                                Value="{AppThemeBinding Light={StaticResource InputErrorLight}, Dark={StaticResource InputErrorDark}}" />
                     </DataTrigger>
                     <DataTrigger TargetType="Entry"
-                                 Binding="{Binding EsCorreoInvalido}"
+                                 Binding="{Binding IsEmailInvalid}"
                                  Value="True">
                         <Setter Property="TextColor"
-                                Value="Red" />
+                                Value="{StaticResource DangerColor}" />
                         <Setter Property="BackgroundColor"
-                                Value="#FCF3CF" />
+                                Value="{AppThemeBinding Light={StaticResource InputWarningLight}, Dark={StaticResource InputWarningDark}}" />
                     </DataTrigger>
                 </Entry.Triggers>
             </Entry>
-            <Label Text="* El correo debe ser válido. Si eres estudiante o empleado, usa el dominio @umad.edu.mx o @madero.edu.mx"
-                   TextColor="Orange"
+            <Label Text="* Email must be valid. Students and employees must use @umad.edu.mx or @madero.edu.mx"
+                   TextColor="{StaticResource WarningColor}"
                    FontSize="12"
                    IsVisible="False">
                 <Label.Triggers>
                     <DataTrigger TargetType="Label"
-                                 Binding="{Binding EsCorreoInvalido}"
+                                 Binding="{Binding IsEmailInvalid}"
                                  Value="True">
                         <Setter Property="IsVisible"
                                 Value="True" />
@@ -66,33 +68,33 @@
                 </Label.Triggers>
             </Label>
 
-            <Entry Placeholder="Matrícula (Deja en blanco si eres invitado)"
-                   Text="{Binding Matricula}"
+            <Entry Placeholder="Student ID (Leave blank if visitor)"
+                   Text="{Binding StudentId}"
                    Keyboard="Numeric">
                 <Entry.Triggers>
                     <DataTrigger TargetType="Entry"
-                                 Binding="{Binding Matricula}"
+                                 Binding="{Binding StudentId}"
                                  Value="">
                         <Setter Property="BackgroundColor"
                                 Value="#EAECEE" />
                     </DataTrigger>
                     <DataTrigger TargetType="Entry"
-                                 Binding="{Binding EsMatriculaInvalida}"
+                                 Binding="{Binding IsStudentIdInvalid}"
                                  Value="True">
                         <Setter Property="TextColor"
-                                Value="Red" />
+                                Value="{StaticResource DangerColor}" />
                         <Setter Property="BackgroundColor"
-                                Value="#FCF3CF" />
+                                Value="{AppThemeBinding Light={StaticResource InputWarningLight}, Dark={StaticResource InputWarningDark}}" />
                     </DataTrigger>
                 </Entry.Triggers>
             </Entry>
-            <Label Text="* La matrícula debe tener exactamente 8 números"
-                   TextColor="Orange"
+            <Label Text="* Student ID must be exactly 8 digits"
+                   TextColor="{StaticResource WarningColor}"
                    FontSize="12"
                    IsVisible="False">
                 <Label.Triggers>
                     <DataTrigger TargetType="Label"
-                                 Binding="{Binding EsMatriculaInvalida}"
+                                 Binding="{Binding IsStudentIdInvalid}"
                                  Value="True">
                         <Setter Property="IsVisible"
                                 Value="True" />
@@ -100,33 +102,33 @@
                 </Label.Triggers>
             </Label>
 
-            <Entry Placeholder="Contraseña"
-                   Text="{Binding Contrasena}"
+            <Entry Placeholder="Password"
+                   Text="{Binding Password}"
                    IsPassword="True">
                 <Entry.Triggers>
                     <DataTrigger TargetType="Entry"
-                                 Binding="{Binding Contrasena}"
+                                 Binding="{Binding Password}"
                                  Value="">
                         <Setter Property="BackgroundColor"
-                                Value="#FADBD8" />
+                                Value="{AppThemeBinding Light={StaticResource InputErrorLight}, Dark={StaticResource InputErrorDark}}" />
                     </DataTrigger>
                     <DataTrigger TargetType="Entry"
-                                 Binding="{Binding EsContrasenaInvalida}"
+                                 Binding="{Binding IsPasswordInvalid}"
                                  Value="True">
                         <Setter Property="TextColor"
-                                Value="Red" />
+                                Value="{StaticResource DangerColor}" />
                         <Setter Property="BackgroundColor"
-                                Value="#FCF3CF" />
+                                Value="{AppThemeBinding Light={StaticResource InputWarningLight}, Dark={StaticResource InputWarningDark}}" />
                     </DataTrigger>
                 </Entry.Triggers>
             </Entry>
-            <Label Text="* La contraseña debe tener mínimo 8 caracteres, incluyendo mayúsculas, minúsculas, números y un carácter especial"
-                   TextColor="Orange"
+            <Label Text="* Password must have at least 8 characters, including uppercase, lowercase, numbers and a special character"
+                   TextColor="{StaticResource WarningColor}"
                    FontSize="12"
                    IsVisible="False">
                 <Label.Triggers>
                     <DataTrigger TargetType="Label"
-                                 Binding="{Binding EsContrasenaInvalida}"
+                                 Binding="{Binding IsPasswordInvalid}"
                                  Value="True">
                         <Setter Property="IsVisible"
                                 Value="True" />
@@ -134,14 +136,14 @@
                 </Label.Triggers>
             </Label>
 
-            <Picker Title="Selecciona tu Rol"
+            <Picker Title="Select your Role"
                     ItemsSource="{Binding Roles}"
-                    ItemDisplayBinding="{Binding NombreRol}"
-                    SelectedItem="{Binding Rol}" />
+                    ItemDisplayBinding="{Binding RoleName}"
+                    SelectedItem="{Binding Role}" />
 
-            <Button Text="Crear Cuenta y Solicitar Acceso"
-                    Command="{Binding SaveUsuarioCommand}"
-                    BackgroundColor="#28B463"
+            <Button Text="Create Account &amp; Request Access"
+                    Command="{Binding SaveUserCommand}"
+                    BackgroundColor="{StaticResource SuccessColor}"
                     TextColor="White"
                     Margin="0,20,0,0">
                 <Button.Triggers>
@@ -151,7 +153,7 @@
                         <Setter Property="IsEnabled"
                                 Value="False" />
                         <Setter Property="BackgroundColor"
-                                Value="Gray" />
+                                Value="{AppThemeBinding Light={StaticResource DisabledLight}, Dark={StaticResource DisabledDark}}" />
                     </DataTrigger>
                 </Button.Triggers>
             </Button>

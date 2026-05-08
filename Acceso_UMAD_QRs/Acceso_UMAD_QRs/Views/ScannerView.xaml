@@ -2,19 +2,20 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:Acceso_UMAD_QRs.ViewModels"
-             x:Class="Acceso_UMAD_QRs.Views.EscanerView"
-             x:DataType="vm:RegistroViewModel"
+             x:Class="Acceso_UMAD_QRs.Views.ScannerView"
+             x:DataType="vm:AccessLogViewModel"
              xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
-             Title="Escanear Código QR">
+             BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+             Title="Scan QR Code">
 
     <Grid RowDefinitions="Auto, *, Auto">
 
         <Label Grid.Row="0"
-               Text="Punto de Acceso Activo"
+               Text="Active Access Point"
                HorizontalOptions="Center"
                Margin="10"
                FontAttributes="Bold"
-               TextColor="#003366" />
+               TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
 
         <Border Grid.Row="1"
                 Margin="20"
@@ -22,22 +23,22 @@
                 StrokeShape="RoundRectangle 15">
             <Border.Triggers>
                 <DataTrigger TargetType="Border"
-                             Binding="{Binding EstadoLectura}"
+                             Binding="{Binding ScanState}"
                              Value="0">
                     <Setter Property="BackgroundColor"
-                            Value="LightGray" />
+                            Value="{AppThemeBinding Light=LightGray, Dark=#2D3748}" />
                 </DataTrigger>
                 <DataTrigger TargetType="Border"
-                             Binding="{Binding EstadoLectura}"
+                             Binding="{Binding ScanState}"
                              Value="1">
                     <Setter Property="BackgroundColor"
-                            Value="#28B463" />
+                            Value="{StaticResource SuccessColor}" />
                 </DataTrigger>
                 <DataTrigger TargetType="Border"
-                             Binding="{Binding EstadoLectura}"
+                             Binding="{Binding ScanState}"
                              Value="2">
                     <Setter Property="BackgroundColor"
-                            Value="#E74C3C" />
+                            Value="{StaticResource DangerColor}" />
                 </DataTrigger>
             </Border.Triggers>
 
@@ -49,13 +50,13 @@
                                                Margin="10">
                     <zxing:CameraBarcodeReaderView.Triggers>
                         <DataTrigger TargetType="zxing:CameraBarcodeReaderView"
-                                     Binding="{Binding EstadoLectura}"
+                                     Binding="{Binding ScanState}"
                                      Value="1">
                             <Setter Property="IsVisible"
                                     Value="False" />
                         </DataTrigger>
                         <DataTrigger TargetType="zxing:CameraBarcodeReaderView"
-                                     Binding="{Binding EstadoLectura}"
+                                     Binding="{Binding ScanState}"
                                      Value="2">
                             <Setter Property="IsVisible"
                                     Value="False" />
@@ -64,7 +65,7 @@
                 </zxing:CameraBarcodeReaderView>
 
                 <Label Grid.Row="1"
-                       Text="{Binding MensajeResultado}"
+                       Text="{Binding ResultMessage}"
                        FontSize="18"
                        HorizontalTextAlignment="Center"
                        VerticalOptions="Center"
@@ -73,10 +74,10 @@
                        TextColor="White">
                     <Label.Triggers>
                         <DataTrigger TargetType="Label"
-                                     Binding="{Binding EstadoLectura}"
+                                     Binding="{Binding ScanState}"
                                      Value="0">
                             <Setter Property="TextColor"
-                                    Value="Black" />
+                                    Value="{AppThemeBinding Light=Black, Dark=White}" />
                         </DataTrigger>
                     </Label.Triggers>
                 </Label>
@@ -87,13 +88,13 @@
                                HorizontalOptions="Center"
                                Spacing="15"
                                Margin="0,0,0,20">
-            <Button Text="Simular Éxito"
-                    Command="{Binding SimularAccesoValidoCommand}"
-                    BackgroundColor="#28B463"
+            <Button Text="Simulate Success"
+                    Command="{Binding SimulateValidAccessCommand}"
+                    BackgroundColor="{StaticResource SuccessColor}"
                     TextColor="White" />
-            <Button Text="Simular Fallo"
-                    Command="{Binding SimularAccesoInvalidoCommand}"
-                    BackgroundColor="#E74C3C"
+            <Button Text="Simulate Failure"
+                    Command="{Binding SimulateInvalidAccessCommand}"
+                    BackgroundColor="{StaticResource DangerColor}"
                     TextColor="White" />
         </HorizontalStackLayout>
 

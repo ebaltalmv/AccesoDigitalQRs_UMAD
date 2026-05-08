@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using SharedResources.Data;
 
@@ -10,7 +10,7 @@ namespace MigrationApp
         {
             var optionsBuilder = new DbContextOptionsBuilder<UmadDbContext>();
 
-            optionsBuilder.UseSqlite("Data Source=UmadLocal.db");
+            optionsBuilder.UseSqlite("Data Source=UmadLocal.db", b => b.MigrationsAssembly("MigrationApp"));
 
             return new UmadDbContext(optionsBuilder.Options);
         }

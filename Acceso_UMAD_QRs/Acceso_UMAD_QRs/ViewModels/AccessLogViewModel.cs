@@ -1,0 +1,296 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
+using SharedResources.Data;
+using SharedResources.Models;
+using System.Collections.ObjectModel;
+
+namespace Acceso_UMAD_QRs.ViewModels
+{
+    public partial class AccessLogViewModel : ObservableObject
+    {
+        [ObservableProperty]
+        private ObservableCollection<AccessLogModel> _accessLogs;
+
+        [ObservableProperty]
+        private ObservableCollection<UserModel> _users;
+
+        [ObservableProperty]
+        private string _accessPoint = string.Empty;
+
+        [ObservableProperty]
+        private DateTime _timestamp = DateTime.Now;
+
+        [ObservableProperty]
+        private UserModel _user = new UserModel();
+
+        [ObservableProperty]
+        private ObservableCollection<string> _accessPoints = new() { "Entrada Principal", "Estacionamiento Norte", "Edificio Central", "Biblioteca" };
+
+        [ObservableProperty]
+        private ObservableCollection<string> _locationFilters = new() { "All Locations", "Entrada Principal", "Estacionamiento Norte", "Edificio Central", "Biblioteca" };
+
+        [ObservableProperty]
+        private string _searchFilter = string.Empty;
+
+        [ObservableProperty]
+        private string _locationFilter = "All Locations";
+
+        [ObservableProperty]
+        private string _selectedPoint;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsFormValid))]
+        private bool _isAccessPointValid = false;
+
+        [ObservableProperty]
+        private int _scanState = 0;
+
+        [ObservableProperty]
+        private string _resultMessage = "Point the camera at the user's QR code.";
+
+        public bool IsFormValid => IsAccessPointValid && User != null;
+
+        private readonly UmadDbContext _dataContext;
+
+        public AccessLogViewModel(UmadDbContext dataContext)
+        {
+            AccessLogs = new ObservableCollection<AccessLogModel>();
+            Users = new ObservableCollection<UserModel>();
+            _dataContext = dataContext;
+        }
+
+        [RelayCommand]
+        public async Task FilterHistory()
+        {
+            try
+            {
+                AccessLogs.Clear();
+                var query = _dataContext.AccessLogs.Include(r => r.User).AsNoTracking().AsQueryable();
+
+                if (!string.IsNullOrWhiteSpace(SearchFilter))
+                {
+                    var filter = SearchFilter.ToLower();
+                    query = query.Where(r => r.User.FullName.ToLower().Contains(filter) || (r.User.StudentId != null && r.User.StudentId.Contains(filter)));
+                }
+
+                if (!string.IsNullOrEmpty(LocationFilter) && LocationFilter != "All Locations")
+                {
+                    query = query.Where(r => r.AccessPoint == LocationFilter);
+                }
+
+                var filteredLogs = await query.ToListAsync();
+                foreach (var log in filteredLogs)
+                {
+                    AccessLogs.Add(log);
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not filter history: {ex.Message}", "OK");
+            }
+        }
+
+        public async Task GetAccessLogsAsync()
+        {
+            try
+            {
+                AccessLogs.Clear();
+                var logsFromDb = await _dataContext.AccessLogs.Include(r => r.User).AsNoTracking().ToListAsync();
+                foreach (var log in logsFromDb)
+                {
+                    AccessLogs.Add(log);
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not fetch access logs: {ex.Message}", "OK");
+            }
+        }
+
+        public async Task GetUsersAsync()
+        {
+            try
+            {
+                Users.Clear();
+                Users = new(await _dataContext.Users.AsNoTracking().ToListAsync());
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not fetch users: {ex.Message}", "OK");
+            }
+        }
+
+        partial void OnAccessPointChanged(string value)
+        {
+            IsAccessPointValid = !string.IsNullOrWhiteSpace(value);
+        }
+
+        [RelayCommand]
+        public async Task SaveAccessLog()
+        {
+            await CreateAccessLog();
+            await Shell.Current.GoToAsync("..");
+        }
+
+        private async Task CreateAccessLog()
+        {
+            try
+            {
+                AccessLogModel log = new()
+                {
+                    AccessPoint = this.AccessPoint,
+                    Timestamp = this.Timestamp,
+                    IdUser = this.User.IdUser
+                };
+
+                await _dataContext.AccessLogs.AddAsync(log);
+                await _dataContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not create access log: {ex.Message}", "OK");
+            }
+        }
+
+        public void LoadAccessLogForEdition(AccessLogModel log)
+        {
+            this.AccessPoint = log.AccessPoint;
+            this.Timestamp = log.Timestamp;
+            this.User = this.Users.FirstOrDefault(u => u.IdUser == log.IdUser)!;
+        }
+
+        [RelayCommand]
+        public async Task GoToAddPage()
+        {
+            await Shell.Current.GoToAsync("AddAccessLogPage");
+        }
+
+        [RelayCommand]
+        public async Task GoToEditPage(AccessLogModel log)
+        {
+            await Shell.Current.GoToAsync("AddAccessLogPage", new Dictionary<string, object> { ["AccessLog"] = log });
+        }
+
+        [RelayCommand]
+        public async Task DeleteAccessLog(AccessLogModel log)
+        {
+            string userAnswer = await Shell.Current.DisplayActionSheetAsync("Are you sure you want to delete this record?", "Cancel", "Delete");
+            if (userAnswer == "Cancel") return;
+
+            try
+            {
+                var tracked = _dataContext.ChangeTracker.Entries<AccessLogModel>()
+                                .FirstOrDefault(e => e.Entity.IdLog == log.IdLog)?.Entity;
+
+                var entityToDelete = tracked ?? await _dataContext.AccessLogs.FindAsync(log.IdLog);
+
+                if (entityToDelete != null)
+                {
+                    _dataContext.AccessLogs.Remove(entityToDelete);
+                    await _dataContext.SaveChangesAsync();
+                    AccessLogs = new(await _dataContext.AccessLogs.Include(r => r.User).AsNoTracking().ToListAsync());
+                }
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not delete record: {ex.Message}", "OK");
+            }
+        }
+
+        public async Task Initialize(AccessLogModel log)
+        {
+            await GetUsersAsync();
+            await GetAccessLogsAsync();
+            if (log != null)
+            {
+                LoadAccessLogForEdition(log);
+            }
+        }
+
+        [RelayCommand]
+        private async Task SimulateValidAccess()
+        {
+            ScanState = 1;
+            ResultMessage = "ACCESS GRANTED\nValid Token.";
+
+            if (Users.Any())
+            {
+                this.User = Users.First();
+                this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Unknown Entry");
+                this.Timestamp = DateTime.Now;
+                await CreateAccessLog();
+                await GetAccessLogsAsync();
+            }
+
+            await Task.Delay(3000);
+            ResetScanner();
+        }
+
+        [RelayCommand]
+        private async Task SimulateInvalidAccess()
+        {
+            ScanState = 2;
+            ResultMessage = "ACCESS DENIED\nExpired or Invalid Token.";
+            await Task.Delay(3000);
+            ResetScanner();
+        }
+
+        [RelayCommand]
+        private async Task StartShift()
+        {
+            if (string.IsNullOrEmpty(SelectedPoint))
+            {
+                await Shell.Current.DisplayAlertAsync("Error", "Select an access point first.", "OK");
+                return;
+            }
+
+            Preferences.Default.Set("CurrentAccessPoint", SelectedPoint);
+
+            await Shell.Current.DisplayAlertAsync("Shift Started", $"Logging access at: {SelectedPoint}", "OK");
+            await Shell.Current.GoToAsync(nameof(Views.ScannerView));
+        }
+
+        public async Task ProcessQRScan(string qrHash)
+        {
+            try
+            {
+                var token = await _dataContext.AccessTokens
+                                              .Include(t => t.User)
+                                              .FirstOrDefaultAsync(t => t.QrHash == qrHash);
+
+                if (token != null && token.IsActive && token.ExpirationDate > DateTime.Now)
+                {
+                    ScanState = 1;
+                    ResultMessage = $"ACCESS GRANTED\n{token.User.FullName}";
+
+                    this.User = token.User;
+                    this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Unknown Entry");
+                    this.Timestamp = DateTime.Now;
+                    await CreateAccessLog();
+                    await GetAccessLogsAsync();
+                }
+                else
+                {
+                    ScanState = 2;
+                    ResultMessage = "ACCESS DENIED\nExpired or Invalid Token.";
+                }
+            }
+            catch (Exception ex)
+            {
+                ScanState = 2;
+                ResultMessage = "CONNECTION ERROR\nCheck the database.";
+                Console.WriteLine(ex.Message);
+            }
+
+            await Task.Delay(3000);
+            ResetScanner();
+        }
+
+        private void ResetScanner()
+        {
+            ScanState = 0;
+            ResultMessage = "Point the camera at the user's QR code.";
+        }
+    }
+}

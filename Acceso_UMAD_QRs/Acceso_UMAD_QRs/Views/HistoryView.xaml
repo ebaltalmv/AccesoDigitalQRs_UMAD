@@ -3,50 +3,52 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:Acceso_UMAD_QRs.ViewModels"
              xmlns:models="clr-namespace:SharedResources.Models;assembly=SharedResources"
-             x:Class="Acceso_UMAD_QRs.Views.HistorialView"
-             x:DataType="vm:RegistroViewModel"
-             Title="Auditoría de Accesos">
+             x:Class="Acceso_UMAD_QRs.Views.HistoryView"
+             x:DataType="vm:AccessLogViewModel"
+             BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+             Title="Access Audit">
 
     <Grid RowDefinitions="Auto, *">
 
         <VerticalStackLayout Grid.Row="0"
                              Padding="15"
                              Spacing="10"
-                             BackgroundColor="#F8F9F9">
-            <Label Text="Bitácora de Seguridad"
+                             BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
+            <Label Text="Security Log"
                    FontSize="22"
                    FontAttributes="Bold"
-                   TextColor="#003366" />
+                   TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
 
             <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" RowSpacing="10" ColumnSpacing="10">
                 <SearchBar Grid.Row="0" Grid.ColumnSpan="2"
-                           Placeholder="Buscar nombre o matrícula..."
-                           Text="{Binding FiltroBusqueda}" />
+                           Placeholder="Search name or student ID..."
+                           Text="{Binding SearchFilter}" />
                            
                 <Picker Grid.Row="1" Grid.Column="0"
-                        Title="Todas las locaciones"
-                        ItemsSource="{Binding FiltrosPuntoAcceso}"
-                        SelectedItem="{Binding FiltroLocacion}" />
+                        Title="All Locations"
+                        ItemsSource="{Binding LocationFilters}"
+                        SelectedItem="{Binding LocationFilter}" />
                         
                 <Button Grid.Row="1" Grid.Column="1"
-                        Text="Filtrar"
-                        Command="{Binding FiltrarHistorialCommand}"
-                        BackgroundColor="#003366"
+                        Text="Filter"
+                        Command="{Binding FilterHistoryCommand}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}"
                         TextColor="White"
                         Padding="10,0" />
             </Grid>
         </VerticalStackLayout>
 
         <CollectionView Grid.Row="1"
-                        ItemsSource="{Binding Registros}"
+                        ItemsSource="{Binding AccessLogs}"
                         Margin="10,10,10,0">
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="models:RegistroModel">
+                <DataTemplate x:DataType="models:AccessLogModel">
                     <Border Margin="0,0,0,10"
                             Padding="10"
-                            Stroke="LightGray"
+                            Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
                             StrokeThickness="1"
-                            StrokeShape="RoundRectangle 8">
+                            StrokeShape="RoundRectangle 8"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
 
                         <Grid ColumnDefinitions="Auto, *, Auto"
                               RowDefinitions="Auto, Auto">
@@ -56,32 +58,33 @@
                                      WidthRequest="6"
                                      Margin="0,0,15,0"
                                      CornerRadius="3"
-                                     Color="#28B463">
+                                     Color="{StaticResource SuccessColor}">
                             </BoxView>
 
                             <Label Grid.Row="0"
                                    Grid.Column="1"
-                                   Text="{Binding Usuario.NombreCompleto}"
+                                   Text="{Binding User.FullName}"
                                    FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
                                    FontSize="16" />
                             <Label Grid.Row="1"
                                    Grid.Column="1"
-                                   Text="{Binding Usuario.Matricula}"
-                                   TextColor="Gray"
+                                   Text="{Binding User.StudentId}"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                    FontSize="12" />
 
                             <VerticalStackLayout Grid.RowSpan="2"
                                                  Grid.Column="2"
                                                  HorizontalOptions="End"
                                                  VerticalOptions="Center">
-                                <Label Text="{Binding PuntoAcceso}"
+                                <Label Text="{Binding AccessPoint}"
                                        FontSize="12"
                                        FontAttributes="Bold"
                                        HorizontalOptions="End"
-                                       TextColor="#003366" />
-                                <Label Text="{Binding FechaHora, StringFormat='{0:HH:mm hrs - dd/MM}'}"
+                                       TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+                                <Label Text="{Binding Timestamp, StringFormat='{0:HH:mm hrs - dd/MM}'}"
                                        FontSize="12"
-                                       TextColor="Gray"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                        HorizontalOptions="End" />
                             </VerticalStackLayout>
 

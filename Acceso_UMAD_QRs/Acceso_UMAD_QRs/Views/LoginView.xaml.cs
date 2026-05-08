@@ -4,7 +4,7 @@ namespace Acceso_UMAD_QRs.Views;
 
 public partial class LoginView : ContentPage
 {
-    public LoginView(UsuarioViewModel viewModel)
+    public LoginView(UserViewModel viewModel)
     {
         InitializeComponent();
 

@@ -2,9 +2,9 @@ using Acceso_UMAD_QRs.ViewModels;
 
 namespace Acceso_UMAD_QRs.Views;
 
-public partial class GeneradorAccesoView : ContentPage
+public partial class AccessGeneratorView : ContentPage
 {
-    public GeneradorAccesoView(TokenAccesoViewModel viewModel)
+    public AccessGeneratorView(AccessTokenViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;

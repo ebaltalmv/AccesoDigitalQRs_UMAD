@@ -1,4 +1,4 @@
-﻿using Acceso_UMAD_QRs.ViewModels;
+using Acceso_UMAD_QRs.ViewModels;
 using Acceso_UMAD_QRs.Views;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -27,18 +27,18 @@ namespace Acceso_UMAD_QRs
                 options.UseSqlite($"Filename={dbPath}"));
 
             builder.Services.AddTransient<LoginView>();
-            builder.Services.AddTransient<RegistroView>();
-            builder.Services.AddTransient<MiQRView>();
-            builder.Services.AddTransient<SetupPuntoAccesoView>();
-            builder.Services.AddTransient<EscanerView>();
-            builder.Services.AddTransient<AprobacionesView>();
-            builder.Services.AddTransient<GeneradorAccesoView>();
-            builder.Services.AddTransient<HistorialView>();
+            builder.Services.AddTransient<SignUpView>();
+            builder.Services.AddTransient<MyQRView>();
+            builder.Services.AddTransient<AccessPointSetupView>();
+            builder.Services.AddTransient<ScannerView>();
+            builder.Services.AddTransient<ApprovalsView>();
+            builder.Services.AddTransient<AccessGeneratorView>();
+            builder.Services.AddTransient<HistoryView>();
 
-            builder.Services.AddTransient<UsuarioViewModel>();
-            builder.Services.AddTransient<RolViewModel>();
-            builder.Services.AddTransient<RegistroViewModel>();
-            builder.Services.AddTransient<TokenAccesoViewModel>();
+            builder.Services.AddTransient<UserViewModel>();
+            builder.Services.AddTransient<RoleViewModel>();
+            builder.Services.AddTransient<AccessLogViewModel>();
+            builder.Services.AddTransient<AccessTokenViewModel>();
 
 #if DEBUG
             builder.Logging.AddDebug();

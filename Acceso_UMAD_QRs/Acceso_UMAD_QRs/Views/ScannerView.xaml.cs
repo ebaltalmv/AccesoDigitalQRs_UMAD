@@ -3,9 +3,9 @@ using ZXing.Net.Maui;
 
 namespace Acceso_UMAD_QRs.Views;
 
-public partial class EscanerView : ContentPage
+public partial class ScannerView : ContentPage
 {
-    public EscanerView(RegistroViewModel viewModel)
+    public ScannerView(AccessLogViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;
@@ -33,9 +33,9 @@ public partial class EscanerView : ContentPage
                 Dispatcher.DispatchAsync(async () =>
                 {
                     barcodeReader.IsDetecting = false;
-                    if (BindingContext is RegistroViewModel vm)
+                    if (BindingContext is AccessLogViewModel vm)
                     {
-                        await vm.ProcesarLecturaQR(first.Value);
+                        await vm.ProcessQRScan(first.Value);
                     }
                     await Task.Delay(3000);
                     barcodeReader.IsDetecting = true;

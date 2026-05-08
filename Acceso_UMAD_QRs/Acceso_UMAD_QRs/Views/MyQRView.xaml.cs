@@ -2,9 +2,9 @@ using Acceso_UMAD_QRs.ViewModels;
 
 namespace Acceso_UMAD_QRs.Views;
 
-public partial class HistorialView : ContentPage
+public partial class MyQRView : ContentPage
 {
-    public HistorialView(RegistroViewModel viewModel)
+    public MyQRView(AccessTokenViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;
@@ -13,7 +13,7 @@ public partial class HistorialView : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (BindingContext is RegistroViewModel viewModel)
+        if (BindingContext is AccessTokenViewModel viewModel)
         {
             await viewModel.Initialize(null!);
         }

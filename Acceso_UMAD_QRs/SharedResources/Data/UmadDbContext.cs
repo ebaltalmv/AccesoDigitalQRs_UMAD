@@ -6,10 +6,10 @@ namespace SharedResources.Data;
 public class UmadDbContext : DbContext
 {
     // Aquí declaramos las tablas que existirán en la BD
-    public DbSet<RolModel> Roles { get; set; }
-    public DbSet<UsuarioModel> Usuarios { get; set; }
-    public DbSet<TokenAccesoModel> TokensAcceso { get; set; }
-    public DbSet<RegistroModel> Registros { get; set; }
+    public DbSet<RoleModel> Roles { get; set; }
+    public DbSet<UserModel> Users { get; set; }
+    public DbSet<AccessTokenModel> AccessTokens { get; set; }
+    public DbSet<AccessLogModel> AccessLogs { get; set; }
 
     public UmadDbContext() { }
 
@@ -17,55 +17,55 @@ public class UmadDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<UsuarioModel>(entity =>
+        modelBuilder.Entity<UserModel>(entity =>
         {
-            entity.HasKey(u => u.IdUsuario);
-            entity.HasIndex(u => u.Matricula).IsUnique();
-            entity.Property(u => u.NombreCompleto).HasMaxLength(100).IsRequired();
-            entity.Property(u => u.Correo).HasMaxLength(100).IsRequired();
-            entity.Property(u => u.Contrasena).HasMaxLength(256).IsRequired();
-            entity.Property(u => u.Matricula).HasMaxLength(50);
+            entity.HasKey(u => u.IdUser);
+            entity.HasIndex(u => u.StudentId).IsUnique();
+            entity.Property(u => u.FullName).HasMaxLength(100).IsRequired();
+            entity.Property(u => u.Email).HasMaxLength(100).IsRequired();
+            entity.Property(u => u.Password).HasMaxLength(256).IsRequired();
+            entity.Property(u => u.StudentId).HasMaxLength(50);
 
-            entity.HasOne(u => u.Rol)
-                  .WithMany(r => r.Usuarios)
-                  .HasForeignKey(u => u.IdRol)
+            entity.HasOne(u => u.Role)
+                  .WithMany(r => r.Users)
+                  .HasForeignKey(u => u.IdRole)
                   .IsRequired();
         });
 
-        modelBuilder.Entity<RolModel>(entity =>
+        modelBuilder.Entity<RoleModel>(entity =>
         {
-            entity.HasKey(r => r.IdRol);
-            entity.Property(r => r.NombreRol).HasMaxLength(50).IsRequired();
+            entity.HasKey(r => r.IdRole);
+            entity.Property(r => r.RoleName).HasMaxLength(50).IsRequired();
 
             // Predefinir los roles
             entity.HasData(
-                new RolModel { IdRol = 1, NombreRol = "Estudiante" },
-                new RolModel { IdRol = 2, NombreRol = "Docente" },
-                new RolModel { IdRol = 3, NombreRol = "Administrativo" },
-                new RolModel { IdRol = 4, NombreRol = "Visitante" },
-                new RolModel { IdRol = 5, NombreRol = "Guardia" }
+                new RoleModel { IdRole = 1, RoleName = "Estudiante" },
+                new RoleModel { IdRole = 2, RoleName = "Docente" },
+                new RoleModel { IdRole = 3, RoleName = "Administrativo" },
+                new RoleModel { IdRole = 4, RoleName = "Visitante" },
+                new RoleModel { IdRole = 5, RoleName = "Guardia" }
             );
         });
 
-        modelBuilder.Entity<RegistroModel>(entity =>
+        modelBuilder.Entity<AccessLogModel>(entity =>
         {
-            entity.HasKey(r => r.IdRegistro);
-            entity.Property(r => r.PuntoAcceso).HasMaxLength(100).IsRequired();
+            entity.HasKey(r => r.IdLog);
+            entity.Property(r => r.AccessPoint).HasMaxLength(100).IsRequired();
 
-            entity.HasOne(r => r.Usuario)
-                  .WithMany(u => u.Registros)
-                  .HasForeignKey(r => r.IdUsuario)
+            entity.HasOne(r => r.User)
+                  .WithMany(u => u.AccessLogs)
+                  .HasForeignKey(r => r.IdUser)
                   .IsRequired();
         });
 
-        modelBuilder.Entity<TokenAccesoModel>(entity =>
+        modelBuilder.Entity<AccessTokenModel>(entity =>
         {
             entity.HasKey(t => t.IdToken);
-            entity.Property(t => t.HashQr).HasMaxLength(256).IsRequired();
+            entity.Property(t => t.QrHash).HasMaxLength(256).IsRequired();
 
-            entity.HasOne(t => t.Usuario)
+            entity.HasOne(t => t.User)
                   .WithMany(u => u.Tokens)
-                  .HasForeignKey(t => t.IdUsuario)
+                  .HasForeignKey(t => t.IdUser)
                   .IsRequired();
         });
 

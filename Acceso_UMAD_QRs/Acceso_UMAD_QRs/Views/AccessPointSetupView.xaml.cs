@@ -1,9 +1,9 @@
 using Acceso_UMAD_QRs.ViewModels;
 namespace Acceso_UMAD_QRs.Views;
 
-public partial class SetupPuntoAccesoView : ContentPage
+public partial class AccessPointSetupView : ContentPage
 {
-    public SetupPuntoAccesoView(RegistroViewModel viewModel)
+    public AccessPointSetupView(AccessLogViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;

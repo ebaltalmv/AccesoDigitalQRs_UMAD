@@ -2,11 +2,11 @@ using Acceso_UMAD_QRs.ViewModels;
 
 namespace Acceso_UMAD_QRs.Views;
 
-public partial class RegistroView : ContentPage
+public partial class SignUpView : ContentPage
 {
-    private readonly UsuarioViewModel _viewModel;
+    private readonly UserViewModel _viewModel;
 
-    public RegistroView(UsuarioViewModel viewModel)
+    public SignUpView(UserViewModel viewModel)
     {
         InitializeComponent();
 

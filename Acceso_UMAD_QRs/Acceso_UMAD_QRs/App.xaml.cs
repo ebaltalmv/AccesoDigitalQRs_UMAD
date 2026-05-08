@@ -1,11 +1,11 @@
-﻿using Acceso_UMAD_QRs.Views;
+using Acceso_UMAD_QRs.Views;
 using SharedResources.Models;
 
 namespace Acceso_UMAD_QRs
 {
     public partial class App : Application
     {
-        public static UsuarioModel? UsuarioActual { get; set; }
+        public static UserModel? CurrentUser { get; set; }
 
         public App()
         {
@@ -14,7 +14,7 @@ namespace Acceso_UMAD_QRs
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            var loginView = Handler?.MauiContext?.Services.GetService<LoginView>() ?? new LoginView(Handler?.MauiContext?.Services.GetService<ViewModels.UsuarioViewModel>()!);
+            var loginView = Handler?.MauiContext?.Services.GetService<LoginView>() ?? new LoginView(Handler?.MauiContext?.Services.GetService<ViewModels.UserViewModel>()!);
             return new Window(new NavigationPage(loginView));
         }
     }

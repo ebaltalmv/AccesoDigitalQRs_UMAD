@@ -2,9 +2,9 @@ using Acceso_UMAD_QRs.ViewModels;
 
 namespace Acceso_UMAD_QRs.Views;
 
-public partial class AprobacionesView : ContentPage
+public partial class ApprovalsView : ContentPage
 {
-    public AprobacionesView(TokenAccesoViewModel viewModel)
+    public ApprovalsView(AccessTokenViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;
@@ -13,7 +13,7 @@ public partial class AprobacionesView : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (BindingContext is TokenAccesoViewModel viewModel)
+        if (BindingContext is AccessTokenViewModel viewModel)
         {
             await viewModel.Initialize(null!);
         }
