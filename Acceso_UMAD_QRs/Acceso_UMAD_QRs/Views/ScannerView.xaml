@@ -47,6 +47,10 @@
                                                x:Name="barcodeReader"
                                                BarcodesDetected="CameraBarcodeReaderView_BarcodesDetected"
                                                IsDetecting="True"
+                                               WidthRequest="300"
+                                               HeightRequest="300"
+                                               HorizontalOptions="Center"
+                                               VerticalOptions="Center"
                                                Margin="10">
                     <zxing:CameraBarcodeReaderView.Triggers>
                         <DataTrigger TargetType="zxing:CameraBarcodeReaderView"

@@ -11,9 +11,21 @@ public partial class ScannerView : ContentPage
         BindingContext = viewModel;
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
+        if (status != PermissionStatus.Granted)
+        {
+            status = await Permissions.RequestAsync<Permissions.Camera>();
+            if (status != PermissionStatus.Granted)
+            {
+                await DisplayAlert("Permission Required", "Camera permission is required to scan QR codes.", "OK");
+                return;
+            }
+        }
+
         barcodeReader.Options = new BarcodeReaderOptions
         {
             Formats = BarcodeFormats.OneDimensional | BarcodeFormats.TwoDimensional,

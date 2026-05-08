@@ -61,8 +61,10 @@
                 <VerticalStackLayout>
                     <zxing:BarcodeGeneratorView Format="QrCode"
                                                 Value="{Binding QrHash}"
-                                                WidthRequest="120"
-                                                HeightRequest="120"
+                                                WidthRequest="200"
+                                                HeightRequest="200"
+                                                HorizontalOptions="Center"
+                                                VerticalOptions="Center"
                                                 Margin="10"
                                                 ForegroundColor="Black"
                                                 BackgroundColor="White">
