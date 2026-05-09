@@ -55,35 +55,39 @@
                    HorizontalOptions="Center" />
 
             <Border Padding="10"
+                    WidthRequest="550"
+                    HeightRequest="550"
                     HorizontalOptions="Center"
                     Stroke="{AppThemeBinding Light={StaticResource QrBorderLight}, Dark={StaticResource QrBorderDark}}"
                     BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
-                <VerticalStackLayout>
-                    <zxing:BarcodeGeneratorView Format="QrCode"
-                                                Value="{Binding QrHash}"
-                                                WidthRequest="200"
-                                                HeightRequest="200"
-                                                HorizontalOptions="Center"
-                                                VerticalOptions="Center"
-                                                Margin="10"
-                                                ForegroundColor="Black"
-                                                BackgroundColor="White">
-                        <zxing:BarcodeGeneratorView.Triggers>
-                            <DataTrigger TargetType="zxing:BarcodeGeneratorView"
-                                         Binding="{Binding IsExpired}"
-                                         Value="True">
-                                <Setter Property="Opacity"
-                                        Value="0.2" />
-                            </DataTrigger>
-                        </zxing:BarcodeGeneratorView.Triggers>
-                    </zxing:BarcodeGeneratorView>
+                    <VerticalStackLayout
+                        WidthRequest="500"
+                        HeightRequest="500">
+                        <zxing:BarcodeGeneratorView Format="QrCode"
+                                                    Value="{Binding QrHash}"
+                                                    HorizontalOptions="Center"
+                                                    VerticalOptions="Center"
+                                                    Margin="10"
+                                                    ForegroundColor="Black"
+                                                    BackgroundColor="White">
+                            <zxing:BarcodeGeneratorView.Triggers>
+                                <DataTrigger TargetType="zxing:BarcodeGeneratorView"
+                                             Binding="{Binding IsExpired}"
+                                             Value="True">
+                                    <Setter Property="Opacity"
+                                            Value="0.2" />
+                                </DataTrigger>
+                            </zxing:BarcodeGeneratorView.Triggers>
+                        </zxing:BarcodeGeneratorView>
 
-                    <Label Text="{Binding QrHash}"
-                           HorizontalOptions="Center"
-                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                           FontSize="10"
-                           Margin="0,5" />
-                </VerticalStackLayout>
+                        <VerticalStackLayout>
+                            <Label Text="{Binding QrHash}"
+                                   HorizontalOptions="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                   FontSize="10"
+                                   Margin="0,5" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
             </Border>
 
             <HorizontalStackLayout HorizontalOptions="Center"
