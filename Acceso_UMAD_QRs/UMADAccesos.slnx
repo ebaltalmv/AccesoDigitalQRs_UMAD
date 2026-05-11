@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="UMADAccesos/UMADAccesos.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+  <Project Path="MigrationApp/MigrationApp.csproj" />
+  <Project Path="SharedResources/SharedResources.csproj" />
+</Solution>

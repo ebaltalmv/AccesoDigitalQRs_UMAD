@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                    x:Class="UMADAccesos.Resources.Styles.ThemeColors">
+
+    <!-- Page & Surface Colors -->
+    <Color x:Key="PageBackgroundLight">#FFFFFF</Color>
+    <Color x:Key="PageBackgroundDark">#1A1A2E</Color>
+
+    <Color x:Key="SurfaceLight">#F8F9F9</Color>
+    <Color x:Key="SurfaceDark">#16213E</Color>
+
+    <Color x:Key="CardBackgroundLight">#FFFFFF</Color>
+    <Color x:Key="CardBackgroundDark">#0F3460</Color>
+
+    <!-- Text Colors -->
+    <Color x:Key="TextPrimaryLight">#1B1B1B</Color>
+    <Color x:Key="TextPrimaryDark">#E8E8E8</Color>
+
+    <Color x:Key="TextSecondaryLight">#6C757D</Color>
+    <Color x:Key="TextSecondaryDark">#A0AEC0</Color>
+
+    <!-- Accent / Brand Colors -->
+    <Color x:Key="PrimaryAccent">#003366</Color>
+    <Color x:Key="PrimaryAccentDark">#4DA8DA</Color>
+
+    <Color x:Key="SuccessColor">#28B463</Color>
+    <Color x:Key="DangerColor">#E74C3C</Color>
+    <Color x:Key="WarningColor">#F39C12</Color>
+
+    <!-- Border / Separator -->
+    <Color x:Key="BorderLight">#DEE2E6</Color>
+    <Color x:Key="BorderDark">#2D3748</Color>
+
+    <!-- Input Fields -->
+    <Color x:Key="InputBackgroundLight">#FFFFFF</Color>
+    <Color x:Key="InputBackgroundDark">#1E293B</Color>
+
+    <Color x:Key="InputErrorLight">#FADBD8</Color>
+    <Color x:Key="InputErrorDark">#5C1A1A</Color>
+
+    <Color x:Key="InputWarningLight">#FCF3CF</Color>
+    <Color x:Key="InputWarningDark">#5C4A1A</Color>
+
+    <!-- QR View specific -->
+    <Color x:Key="QrBorderLight">LightGray</Color>
+    <Color x:Key="QrBorderDark">#4A5568</Color>
+
+    <Color x:Key="StatusApprovedLight">#D4EFDF</Color>
+    <Color x:Key="StatusApprovedDark">#1A3C2A</Color>
+
+    <Color x:Key="StatusExpiredLight">#FADBD8</Color>
+    <Color x:Key="StatusExpiredDark">#3C1A1A</Color>
+
+    <!-- Disabled -->
+    <Color x:Key="DisabledLight">Gray</Color>
+    <Color x:Key="DisabledDark">#4A5568</Color>
+
+</ResourceDictionary>
