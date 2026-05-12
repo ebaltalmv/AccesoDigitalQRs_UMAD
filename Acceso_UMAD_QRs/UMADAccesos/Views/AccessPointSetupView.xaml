@@ -7,12 +7,12 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
              Title="Configuración de Acceso">
 
+    <ScrollView>
     <VerticalStackLayout Spacing="20"
                          Padding="30"
-                         VerticalOptions="Center">
-        <Image Source="guard_icon.png"
-               HeightRequest="80"
-               HorizontalOptions="Center" />
+                         VerticalOptions="Center"
+                         HorizontalOptions="Center"
+                         MaximumWidthRequest="500">
         <Label Text="Configuración de Turno"
                FontSize="24"
                FontAttributes="Bold"
@@ -44,4 +44,5 @@
             </Button.Triggers>
         </Button>
     </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

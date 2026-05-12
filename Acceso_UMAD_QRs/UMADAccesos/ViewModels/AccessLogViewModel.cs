@@ -28,13 +28,13 @@ namespace UMADAccesos.ViewModels
         private ObservableCollection<string> _accessPoints = new() { "Entrada Principal", "Estacionamiento Norte", "Edificio Central", "Biblioteca" };
 
         [ObservableProperty]
-        private ObservableCollection<string> _locationFilters = new() { "All Locations", "Entrada Principal", "Estacionamiento Norte", "Edificio Central", "Biblioteca" };
+        private ObservableCollection<string> _locationFilters = new() { "Todas las Ubicaciones", "Entrada Principal", "Estacionamiento Norte", "Edificio Central", "Biblioteca" };
 
         [ObservableProperty]
         private string _searchFilter = string.Empty;
 
         [ObservableProperty]
-        private string _locationFilter = "All Locations";
+        private string _locationFilter = "Todas las Ubicaciones";
 
         [ObservableProperty]
         private string _selectedPoint = string.Empty;
@@ -47,7 +47,7 @@ namespace UMADAccesos.ViewModels
         private int _scanState = 0;
 
         [ObservableProperty]
-        private string _resultMessage = "Point the camera at the user's QR code.";
+        private string _resultMessage = "Apunta la cámara al código QR del usuario.";
 
         public bool IsFormValid => IsAccessPointValid && User != null;
 
@@ -74,7 +74,7 @@ namespace UMADAccesos.ViewModels
                     query = query.Where(r => r.User.FullName.ToLower().Contains(filter) || (r.User.StudentId != null && r.User.StudentId.Contains(filter)));
                 }
 
-                if (!string.IsNullOrEmpty(LocationFilter) && LocationFilter != "All Locations")
+                if (!string.IsNullOrEmpty(LocationFilter) && LocationFilter != "Todas las Ubicaciones")
                 {
                     query = query.Where(r => r.AccessPoint == LocationFilter);
                 }
@@ -87,7 +87,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not filter history: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudo filtrar el historial: {ex.Message}", "Aceptar");
             }
         }
 
@@ -104,7 +104,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not fetch access logs: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los registros de acceso: {ex.Message}", "Aceptar");
             }
         }
 
@@ -117,7 +117,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not fetch users: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los usuarios: {ex.Message}", "Aceptar");
             }
         }
 
@@ -149,7 +149,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not create access log: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo crear el registro de acceso: {ex.Message}", "Aceptar");
             }
         }
 
@@ -175,7 +175,7 @@ namespace UMADAccesos.ViewModels
         [RelayCommand]
         public async Task DeleteAccessLog(AccessLogModel log)
         {
-            string userAnswer = await Shell.Current.DisplayActionSheetAsync("Are you sure you want to delete this record?", "Cancel", "Delete");
+            string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estás seguro de que quieres eliminar este registro?", "Cancelar", "Eliminar");
             if (userAnswer == "Cancel") return;
 
             try
@@ -194,7 +194,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not delete record: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo eliminar el registro: {ex.Message}", "Aceptar");
             }
         }
 
@@ -212,12 +212,12 @@ namespace UMADAccesos.ViewModels
         private async Task SimulateValidAccess()
         {
             ScanState = 1;
-            ResultMessage = "ACCESS GRANTED\nValid Token.";
+            ResultMessage = "ACCESO CONCEDIDO\nToken Válido.";
 
             if (Users.Any())
             {
                 this.User = Users.First();
-                this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Unknown Entry");
+                this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Punto Desconocido");
                 this.Timestamp = DateTime.Now;
                 await CreateAccessLog();
                 await GetAccessLogsAsync();
@@ -231,7 +231,7 @@ namespace UMADAccesos.ViewModels
         private async Task SimulateInvalidAccess()
         {
             ScanState = 2;
-            ResultMessage = "ACCESS DENIED\nExpired or Invalid Token.";
+            ResultMessage = "ACCESO DENEGADO\nToken Expirado o Inválido.";
             await Task.Delay(3000);
             ResetScanner();
         }
@@ -241,13 +241,13 @@ namespace UMADAccesos.ViewModels
         {
             if (string.IsNullOrEmpty(SelectedPoint))
             {
-                await Shell.Current.DisplayAlertAsync("Error", "Select an access point first.", "OK");
+                await Shell.Current.DisplayAlertAsync("Error", "Selecciona un punto de acceso primero.", "Aceptar");
                 return;
             }
 
             Preferences.Default.Set("CurrentAccessPoint", SelectedPoint);
 
-            await Shell.Current.DisplayAlertAsync("Shift Started", $"Logging access at: {SelectedPoint}", "OK");
+            await Shell.Current.DisplayAlertAsync("Turno Iniciado", $"Registrando acceso en: {SelectedPoint}", "Aceptar");
             await Shell.Current.GoToAsync(nameof(Views.ScannerView));
         }
 
@@ -262,10 +262,10 @@ namespace UMADAccesos.ViewModels
                 if (token != null && token.IsActive && token.ExpirationDate > DateTime.Now)
                 {
                     ScanState = 1;
-                    ResultMessage = $"ACCESS GRANTED\n{token.User.FullName}";
+                    ResultMessage = $"ACCESO CONCEDIDO\n{token.User.FullName}";
 
                     this.User = token.User;
-                    this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Unknown Entry");
+                    this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Punto Desconocido");
                     this.Timestamp = DateTime.Now;
                     await CreateAccessLog();
                     await GetAccessLogsAsync();
@@ -273,13 +273,13 @@ namespace UMADAccesos.ViewModels
                 else
                 {
                     ScanState = 2;
-                    ResultMessage = "ACCESS DENIED\nExpired or Invalid Token.";
+                    ResultMessage = "ACCESO DENEGADO\nToken Expirado o Inválido.";
                 }
             }
             catch (Exception ex)
             {
                 ScanState = 2;
-                ResultMessage = "CONNECTION ERROR\nCheck the database.";
+                ResultMessage = "ERROR DE CONEXIÓN\nVerifica la base de datos.";
                 Console.WriteLine(ex.Message);
             }
 
@@ -290,7 +290,7 @@ namespace UMADAccesos.ViewModels
         private void ResetScanner()
         {
             ScanState = 0;
-            ResultMessage = "Point the camera at the user's QR code.";
+            ResultMessage = "Apunta la cámara al código QR del usuario.";
         }
     }
 }

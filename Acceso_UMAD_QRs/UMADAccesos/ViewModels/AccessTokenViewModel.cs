@@ -41,11 +41,11 @@ namespace UMADAccesos.ViewModels
         [NotifyPropertyChangedFor(nameof(IsApproved))]
         [NotifyPropertyChangedFor(nameof(IsPending))]
         [NotifyPropertyChangedFor(nameof(IsExpired))]
-        private string _userStatus = "Approved";
+        private string _userStatus = "Aprobado";
 
-        public bool IsApproved => UserStatus == "Approved";
-        public bool IsPending => UserStatus == "Pending";
-        public bool IsExpired => UserStatus == "Expired";
+        public bool IsApproved => UserStatus == "Aprobado";
+        public bool IsPending => UserStatus == "Pendiente";
+        public bool IsExpired => UserStatus == "Expirado";
 
         [ObservableProperty]
         private ObservableCollection<UserModel> _pendingRequests;
@@ -74,7 +74,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not fetch tokens: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los tokens: {ex.Message}", "Aceptar");
             }
         }
 
@@ -87,7 +87,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not fetch users: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los usuarios: {ex.Message}", "Aceptar");
             }
         }
 
@@ -105,7 +105,7 @@ namespace UMADAccesos.ViewModels
                 if (foundToken != null)
                 {
                     await EditToken(foundToken);
-                    await Shell.Current.DisplayAlertAsync("Edit Success", "The record has been edited successfully", "OK");
+                    await Shell.Current.DisplayAlertAsync("Edición Exitosa", "El registro ha sido editado con éxito", "Aceptar");
                     await Shell.Current.GoToAsync("..");
                     return;
                 }
@@ -114,7 +114,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not save token: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo guardar el token: {ex.Message}", "Aceptar");
             }
         }
 
@@ -135,7 +135,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not create token: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo crear el token: {ex.Message}", "Aceptar");
             }
         }
 
@@ -153,7 +153,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not edit token: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo editar el token: {ex.Message}", "Aceptar");
             }
         }
 
@@ -180,8 +180,8 @@ namespace UMADAccesos.ViewModels
         [RelayCommand]
         public async Task DeleteToken(AccessTokenModel token)
         {
-            string userAnswer = await Shell.Current.DisplayActionSheetAsync("Are you sure you want to delete this token?", "Cancel", "Delete");
-            if (userAnswer == "Cancel") return;
+            string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estás seguro de que quieres eliminar este token?", "Cancelar", "Eliminar");
+            if (userAnswer == "Cancelar") return;
 
             try
             {
@@ -199,7 +199,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not delete token: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo eliminar el token: {ex.Message}", "Aceptar");
             }
         }
 
@@ -225,11 +225,11 @@ namespace UMADAccesos.ViewModels
                 {
                     this.QrHash = myToken.QrHash;
                     this.ExpirationDate = myToken.ExpirationDate;
-                    this.UserStatus = myToken.IsActive && myToken.ExpirationDate > DateTime.Now ? "Approved" : "Expired";
+                    this.UserStatus = myToken.IsActive && myToken.ExpirationDate > DateTime.Now ? "Aprobado" : "Expirado";
                 }
                 else
                 {
-                    this.UserStatus = "Pending";
+                    this.UserStatus = "Pendiente";
                 }
             }
         }
@@ -252,7 +252,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not load pending requests: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron cargar las solicitudes pendientes: {ex.Message}", "Aceptar");
             }
         }
 
@@ -268,8 +268,8 @@ namespace UMADAccesos.ViewModels
         [RelayCommand]
         private async Task RequestRenewal()
         {
-            await Shell.Current.DisplayAlertAsync("Request", "Your renewal request has been sent.", "OK");
-            this.UserStatus = "Pending";
+            await Shell.Current.DisplayAlertAsync("Solicitud", "Tu solicitud de renovación ha sido enviada.", "Aceptar");
+            this.UserStatus = "Pendiente";
         }
 
         [RelayCommand]
@@ -277,7 +277,7 @@ namespace UMADAccesos.ViewModels
         {
             if (this.User == null)
             {
-                await Shell.Current.DisplayAlertAsync("Error", "No user has been selected to generate the token.", "OK");
+                await Shell.Current.DisplayAlertAsync("Error", "No se ha seleccionado ningún usuario para generar el token.", "Aceptar");
                 return;
             }
 
@@ -287,7 +287,7 @@ namespace UMADAccesos.ViewModels
 
             await CreateToken();
 
-            await Shell.Current.DisplayAlertAsync("Success", $"Token generated and assigned successfully to {User.FullName}.", "OK");
+            await Shell.Current.DisplayAlertAsync("Éxito", $"Token generado y asignado con éxito a {User.FullName}.", "Aceptar");
 
             await LoadPendingRequests();
             await Shell.Current.GoToAsync("..");

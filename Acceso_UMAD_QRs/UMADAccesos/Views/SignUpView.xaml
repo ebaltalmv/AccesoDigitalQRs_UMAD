@@ -3,12 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:UMADAccesos.ViewModels"
              x:Class="UMADAccesos.Views.SignUpView"
+             x:DataType="vm:UserViewModel"
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
              Title="Registro de Usuario">
 
     <ScrollView>
+        <Grid HorizontalOptions="Fill" VerticalOptions="Fill">
         <VerticalStackLayout Spacing="15"
-                             Padding="25">
+                             Padding="25"
+                             HorizontalOptions="Center"
+                             MaximumWidthRequest="500">
 
             <Label Text="Crea tu cuenta"
                    FontSize="24"
@@ -136,10 +140,17 @@
                 </Label.Triggers>
             </Label>
 
-            <Picker Title="Selecciona tu Rol"
-                    ItemsSource="{Binding Roles}"
-                    ItemDisplayBinding="{Binding RoleName}"
-                    SelectedItem="{Binding Role}" />
+            <Border StrokeShape="RoundRectangle 8"
+                    Padding="10,0"
+                    Margin="0,5"
+                    Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
+                <Picker Title="Selecciona tu Rol"
+                        ItemsSource="{Binding Roles}"
+                        ItemDisplayBinding="{Binding RoleName}"
+                        SelectedItem="{Binding Role}"
+                        HorizontalOptions="Fill" />
+            </Border>
 
             <Button Text="Crear Cuenta y Solicitar Acceso"
                     Command="{Binding SaveUserCommand}"
@@ -159,5 +170,6 @@
             </Button>
 
         </VerticalStackLayout>
+        </Grid>
     </ScrollView>
 </ContentPage>

@@ -8,7 +8,9 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
              Title="Aprobaciones Pendientes">
 
-    <Grid RowDefinitions="Auto, *">
+    <Grid RowDefinitions="Auto, *"
+          HorizontalOptions="Center"
+          MaximumWidthRequest="700">
         <Label Grid.Row="0"
                Text="Solicitudes de Acceso"
                FontSize="20"

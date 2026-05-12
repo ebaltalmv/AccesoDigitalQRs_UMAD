@@ -8,7 +8,9 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
              Title="Historial de Accesos">
 
-    <Grid RowDefinitions="Auto, *">
+    <Grid RowDefinitions="Auto, *"
+          HorizontalOptions="Center"
+          MaximumWidthRequest="700">
 
         <VerticalStackLayout Grid.Row="0"
                              Padding="15"
