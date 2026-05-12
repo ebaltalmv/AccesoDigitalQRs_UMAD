@@ -10,7 +10,7 @@ public partial class AccessGeneratorView : ContentPage
         BindingContext = viewModel;
     }
 
-    private void OnTypeChanged(object sender, CheckedChangedEventArgs e)
+    private void OnTypeChanged(object? sender, CheckedChangedEventArgs e)
     {
     }
 }
