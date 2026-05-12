@@ -6,7 +6,8 @@
              x:DataType="vm:UserViewModel"
              Title="Acceso UMAD"
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
-             Shell.NavBarIsVisible="False">
+             Shell.NavBarIsVisible="False"
+             NavigationPage.HasNavigationBar="False">
 
     <!-- Layout de dos columnas para Mac/Desktop, una sola para móvil -->
     <Grid ColumnDefinitions="{OnIdiom Desktop='*, Auto, *', Default='*'}"
@@ -19,11 +20,11 @@
               Padding="{OnIdiom Desktop=40, Default=30}">
             <VerticalStackLayout VerticalOptions="Center"
                                  HorizontalOptions="Center"
-                                 Spacing="16"
+                                 Spacing="{OnIdiom Desktop=16, Default=10}"
                                  MaximumWidthRequest="{OnIdiom Desktop=360, Default=500}">
 
                 <Label Text="UMAD"
-                       FontSize="{OnIdiom Desktop=48, Default=32}"
+                       FontSize="{OnIdiom Desktop=48, Default=28}"
                        FontAttributes="Bold"
                        TextColor="White"
                        HorizontalOptions="Center" />
@@ -53,8 +54,8 @@
         <!-- Panel formulario -->
         <ScrollView Grid.Column="{OnIdiom Desktop=2, Default=0}"
                     Grid.Row="{OnIdiom Desktop=0, Default=1}">
-            <VerticalStackLayout Spacing="16"
-                                 Padding="{OnIdiom Desktop='50, 40', Default='30, 40'}"
+            <VerticalStackLayout Spacing="{OnIdiom Desktop=16, Default=12}"
+                                 Padding="{OnIdiom Desktop='50, 40', Default='30, 20'}"
                                  VerticalOptions="Center"
                                  HorizontalOptions="Center"
                                  MaximumWidthRequest="{OnIdiom Desktop=400, Default=500}">
@@ -116,7 +117,7 @@
 
                 <BoxView HeightRequest="1"
                          BackgroundColor="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
-                         Margin="0,20" />
+                         Margin="{OnIdiom Desktop='0,20', Default='0,10'}" />
 
                 <Label Text="¿Nuevo alumno o visitante?"
                        HorizontalOptions="Center"
