@@ -37,7 +37,7 @@ namespace UMADAccesos
 
             builder.Services.AddTransient<UserViewModel>();
             builder.Services.AddTransient<RoleViewModel>();
-            builder.Services.AddTransient<AccessLogViewModel>();
+            builder.Services.AddSingleton<AccessLogViewModel>();
             builder.Services.AddTransient<AccessTokenViewModel>();
 
 #if DEBUG
