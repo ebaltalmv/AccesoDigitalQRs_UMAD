@@ -9,45 +9,75 @@
              Title="Aprobaciones Pendientes">
 
     <Grid RowDefinitions="Auto, *"
-          HorizontalOptions="Center"
-          MaximumWidthRequest="700">
+          HorizontalOptions="Fill"
+          Padding="{OnIdiom Desktop='40, 20', Default=15}">
+        <Grid.MaximumWidthRequest>
+            <OnIdiom Desktop="1200" Default="10000" />
+        </Grid.MaximumWidthRequest>
+
         <Label Grid.Row="0"
                Text="Solicitudes de Acceso"
-               FontSize="20"
+               FontSize="28"
                FontAttributes="Bold"
-               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
-               Margin="20,10" />
+               TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}"
+               Margin="5,10,5,20" />
 
-        <CollectionView Grid.Row="1"
+        <CollectionView x:Name="ApprovalsList"
+                        Grid.Row="1"
                         ItemsSource="{Binding PendingRequests}"
-                        Margin="10">
+                        HorizontalOptions="Fill"
+                        Margin="0">
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" 
+                                 Span="{OnIdiom Desktop=2, Default=1}" 
+                                 HorizontalItemSpacing="20" 
+                                 VerticalItemSpacing="15" />
+            </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:UserModel">
-                    <Border Margin="5"
-                            Padding="15"
-                            Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
-                            StrokeThickness="1"
-                            StrokeShape="RoundRectangle 8"
-                            BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
+                    <Border StrokeShape="RoundRectangle 16"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"
+                            Padding="20"
+                            StrokeThickness="0"
+                            Margin="0,0,0,5">
+                        <Border.Shadow>
+                            <Shadow Brush="Black" Offset="0,4" Radius="10" Opacity="0.08" />
+                        </Border.Shadow>
 
-                        <Grid ColumnDefinitions="*, Auto">
-                            <VerticalStackLayout Grid.Column="0">
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="15">
+                            <VerticalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
                                 <Label Text="{Binding FullName}"
                                        FontAttributes="Bold"
+                                       FontSize="18"
                                        TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
-                                       FontSize="16" />
-                                <HorizontalStackLayout Spacing="10">
-                                    <Label Text="{Binding Role.RoleName}"
-                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                       LineBreakMode="WordWrap" />
+                                
+                                <FlexLayout Wrap="Wrap" AlignItems="Center">
+                                    <Border BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+                                            Padding="10,4"
+                                            StrokeThickness="0"
+                                            Margin="0,0,10,0"
+                                            StrokeShape="RoundRectangle 6">
+                                        <Label Text="{Binding Role.RoleName}"
+                                               FontSize="11"
+                                               FontAttributes="Bold"
+                                               TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+                                    </Border>
                                     <Label Text="{Binding StudentId}"
+                                           FontSize="13"
                                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                </HorizontalStackLayout>
+                                </FlexLayout>
                             </VerticalStackLayout>
 
                             <Button Grid.Column="1"
                                     Text="Gestionar"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AccessTokenViewModel}}, Path=GoToGenerateTokenCommand}"
                                     CommandParameter="{Binding .}"
+                                    VerticalOptions="Center"
+                                    HeightRequest="44"
+                                    Padding="15,0"
+                                    FontSize="14"
+                                    CornerRadius="8"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}"
                                     TextColor="White" />
                         </Grid>

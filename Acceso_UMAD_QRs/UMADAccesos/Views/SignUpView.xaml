@@ -7,169 +7,240 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
              Title="Registro de Usuario">
 
-    <ScrollView>
-        <Grid HorizontalOptions="Fill" VerticalOptions="Fill">
-        <VerticalStackLayout Spacing="15"
-                             Padding="25"
-                             HorizontalOptions="Center"
-                             MaximumWidthRequest="500">
+    <!-- Layout de dos columnas: info a la izquierda, form a la derecha -->
+    <Grid ColumnDefinitions="{OnIdiom Desktop='*, Auto, *', Default='*'}"
+          RowDefinitions="{OnIdiom Desktop='*', Default='Auto, *'}">
 
-            <Label Text="Crea tu cuenta"
-                   FontSize="24"
-                   FontAttributes="Bold"
-                   TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
-                   HorizontalOptions="Center" />
-            <Label Text="Tus datos serán enviados a Administración para autorizar tu código QR."
-                   FontSize="14"
-                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                   HorizontalOptions="Center"
-                   HorizontalTextAlignment="Center"
-                   Margin="0,0,0,15" />
+        <!-- Panel instrucciones (Izquierda en Desktop, Superior en Mobile) -->
+        <Grid Grid.Column="0"
+              Grid.Row="0"
+              BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+              Padding="{OnIdiom Desktop=40, Default=25}">
+            <VerticalStackLayout VerticalOptions="{OnIdiom Desktop=Center, Default=Start}"
+                                 Spacing="20"
+                                 MaximumWidthRequest="{OnIdiom Desktop=380, Default=500}">
 
-            <Entry Placeholder="Nombre Completo (Obligatorio)"
-                   Text="{Binding FullName}">
-                <Entry.Triggers>
-                    <DataTrigger TargetType="Entry"
-                                 Binding="{Binding FullName}"
-                                 Value="">
-                        <Setter Property="BackgroundColor"
-                                Value="{AppThemeBinding Light={StaticResource InputErrorLight}, Dark={StaticResource InputErrorDark}}" />
-                    </DataTrigger>
-                </Entry.Triggers>
-            </Entry>
+                <Label Text="Solicitud de Acceso"
+                       FontSize="28"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
 
-            <Entry Placeholder="Correo Electrónico (Obligatorio)"
-                   Text="{Binding Email}"
-                   Keyboard="Email">
-                <Entry.Triggers>
-                    <DataTrigger TargetType="Entry"
-                                 Binding="{Binding Email}"
-                                 Value="">
-                        <Setter Property="BackgroundColor"
-                                Value="{AppThemeBinding Light={StaticResource InputErrorLight}, Dark={StaticResource InputErrorDark}}" />
-                    </DataTrigger>
-                    <DataTrigger TargetType="Entry"
-                                 Binding="{Binding IsEmailInvalid}"
-                                 Value="True">
-                        <Setter Property="TextColor"
-                                Value="{StaticResource DangerColor}" />
-                        <Setter Property="BackgroundColor"
-                                Value="{AppThemeBinding Light={StaticResource InputWarningLight}, Dark={StaticResource InputWarningDark}}" />
-                    </DataTrigger>
-                </Entry.Triggers>
-            </Entry>
-            <Label Text="* El correo debe ser válido. Alumnos y empleados deben usar @umad.edu.mx o @madero.edu.mx"
-                   TextColor="{StaticResource WarningColor}"
-                   FontSize="12"
-                   IsVisible="False">
-                <Label.Triggers>
-                    <DataTrigger TargetType="Label"
-                                 Binding="{Binding IsEmailInvalid}"
-                                 Value="True">
-                        <Setter Property="IsVisible"
-                                Value="True" />
-                    </DataTrigger>
-                </Label.Triggers>
-            </Label>
+                <BoxView HeightRequest="3"
+                         WidthRequest="50"
+                         Color="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
 
-            <Entry Placeholder="Matrícula/ID (Dejar en blanco si es visitante)"
-                   Text="{Binding StudentId}"
-                   Keyboard="Numeric">
-                <Entry.Triggers>
-                    <DataTrigger TargetType="Entry"
-                                 Binding="{Binding StudentId}"
-                                 Value="">
-                        <Setter Property="BackgroundColor"
-                                Value="#EAECEE" />
-                    </DataTrigger>
-                    <DataTrigger TargetType="Entry"
-                                 Binding="{Binding IsStudentIdInvalid}"
-                                 Value="True">
-                        <Setter Property="TextColor"
-                                Value="{StaticResource DangerColor}" />
-                        <Setter Property="BackgroundColor"
-                                Value="{AppThemeBinding Light={StaticResource InputWarningLight}, Dark={StaticResource InputWarningDark}}" />
-                    </DataTrigger>
-                </Entry.Triggers>
-            </Entry>
-            <Label Text="* La Matrícula debe tener exactamente 8 dígitos"
-                   TextColor="{StaticResource WarningColor}"
-                   FontSize="12"
-                   IsVisible="False">
-                <Label.Triggers>
-                    <DataTrigger TargetType="Label"
-                                 Binding="{Binding IsStudentIdInvalid}"
-                                 Value="True">
-                        <Setter Property="IsVisible"
-                                Value="True" />
-                    </DataTrigger>
-                </Label.Triggers>
-            </Label>
+                <Label Text="¿Cómo funciona?"
+                       FontSize="16"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
+                       Margin="0,10,0,0" />
 
-            <Entry Placeholder="Contraseña"
-                   Text="{Binding Password}"
-                   IsPassword="True">
-                <Entry.Triggers>
-                    <DataTrigger TargetType="Entry"
-                                 Binding="{Binding Password}"
-                                 Value="">
-                        <Setter Property="BackgroundColor"
-                                Value="{AppThemeBinding Light={StaticResource InputErrorLight}, Dark={StaticResource InputErrorDark}}" />
-                    </DataTrigger>
-                    <DataTrigger TargetType="Entry"
-                                 Binding="{Binding IsPasswordInvalid}"
-                                 Value="True">
-                        <Setter Property="TextColor"
-                                Value="{StaticResource DangerColor}" />
-                        <Setter Property="BackgroundColor"
-                                Value="{AppThemeBinding Light={StaticResource InputWarningLight}, Dark={StaticResource InputWarningDark}}" />
-                    </DataTrigger>
-                </Entry.Triggers>
-            </Entry>
-            <Label Text="* La contraseña debe tener al menos 8 caracteres, incluyendo mayúsculas, minúsculas, números y un carácter especial"
-                   TextColor="{StaticResource WarningColor}"
-                   FontSize="12"
-                   IsVisible="False">
-                <Label.Triggers>
-                    <DataTrigger TargetType="Label"
-                                 Binding="{Binding IsPasswordInvalid}"
-                                 Value="True">
-                        <Setter Property="IsVisible"
-                                Value="True" />
-                    </DataTrigger>
-                </Label.Triggers>
-            </Label>
+                <!-- Paso 1 -->
+                <Grid ColumnDefinitions="40, *" ColumnSpacing="12">
+                    <Border Grid.Column="0"
+                             BackgroundColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}"
+                             StrokeShape="RoundRectangle 20"
+                             StrokeThickness="0"
+                             WidthRequest="36"
+                             HeightRequest="36">
+                        <Label Text="1"
+                               TextColor="White"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                        <Label Text="Llena el formulario"
+                               FontAttributes="Bold"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                        <Label Text="Ingresa tus datos personales y elige tu rol."
+                               FontSize="13"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+                </Grid>
 
-            <Border StrokeShape="RoundRectangle 8"
-                    Padding="10,0"
-                    Margin="0,5"
-                    Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
-                    BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
-                <Picker Title="Selecciona tu Rol"
-                        ItemsSource="{Binding Roles}"
-                        ItemDisplayBinding="{Binding RoleName}"
-                        SelectedItem="{Binding Role}"
-                        HorizontalOptions="Fill" />
-            </Border>
+                <!-- Paso 2 -->
+                <Grid ColumnDefinitions="40, *" ColumnSpacing="12">
+                    <Border Grid.Column="0"
+                             BackgroundColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}"
+                             StrokeShape="RoundRectangle 20"
+                             StrokeThickness="0"
+                             WidthRequest="36"
+                             HeightRequest="36">
+                        <Label Text="2"
+                               TextColor="White"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                        <Label Text="Espera autorización"
+                               FontAttributes="Bold"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                        <Label Text="Administración revisará tu solicitud."
+                               FontSize="13"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+                </Grid>
 
-            <Button Text="Crear Cuenta y Solicitar Acceso"
-                    Command="{Binding SaveUserCommand}"
-                    BackgroundColor="{StaticResource SuccessColor}"
-                    TextColor="White"
-                    Margin="0,20,0,0">
-                <Button.Triggers>
-                    <DataTrigger TargetType="Button"
-                                 Binding="{Binding IsFormValid}"
-                                 Value="False">
-                        <Setter Property="IsEnabled"
-                                Value="False" />
-                        <Setter Property="BackgroundColor"
-                                Value="{AppThemeBinding Light={StaticResource DisabledLight}, Dark={StaticResource DisabledDark}}" />
-                    </DataTrigger>
-                </Button.Triggers>
-            </Button>
+                <!-- Paso 3 -->
+                <Grid ColumnDefinitions="40, *" ColumnSpacing="12">
+                    <Border Grid.Column="0"
+                             BackgroundColor="{StaticResource SuccessColor}"
+                             StrokeShape="RoundRectangle 20"
+                             StrokeThickness="0"
+                             WidthRequest="36"
+                             HeightRequest="36">
+                        <Label Text="3"
+                               TextColor="White"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                        <Label Text="Usa tu QR"
+                               FontAttributes="Bold"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                        <Label Text="Recibirás tu código de acceso digital."
+                               FontSize="13"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+                </Grid>
 
-        </VerticalStackLayout>
+                <Label Text="Alumnos y empleados deben usar correo @umad.edu.mx o @madero.edu.mx"
+                       FontSize="12"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                       Margin="0,16,0,0" />
+            </VerticalStackLayout>
         </Grid>
-    </ScrollView>
+
+        <!-- Separador (solo Desktop) -->
+        <BoxView Grid.Column="1"
+                 IsVisible="{OnIdiom Desktop=True, Default=False}"
+                 WidthRequest="1"
+                 BackgroundColor="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                 VerticalOptions="Fill" />
+
+        <!-- Panel formulario -->
+        <ScrollView Grid.Column="{OnIdiom Desktop=2, Default=0}"
+                    Grid.Row="{OnIdiom Desktop=0, Default=1}">
+            <VerticalStackLayout Spacing="12"
+                                 Padding="{OnIdiom Desktop='50, 40', Default='30, 40'}"
+                                 HorizontalOptions="Center"
+                                 MaximumWidthRequest="{OnIdiom Desktop=420, Default=500}">
+
+                <Label Text="Crear cuenta"
+                       FontSize="26"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                <Label Text="Todos los campos marcados con * son obligatorios."
+                       FontSize="13"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                       Margin="0,0,0,12" />
+
+                <!-- Nombre -->
+                <Label Text="Nombre Completo *"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                <Border StrokeShape="RoundRectangle 10"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource InputBackgroundLight}, Dark={StaticResource InputBackgroundDark}}"
+                        Padding="15,5">
+                    <Entry Placeholder="Nombre y Apellidos"
+                           Text="{Binding FullName}"
+                           HeightRequest="44"
+                           BackgroundColor="Transparent" />
+                </Border>
+
+                <!-- Correo -->
+                <Label Text="Correo Electrónico *"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                       Margin="0,8,0,0" />
+                <Border StrokeShape="RoundRectangle 10"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource InputBackgroundLight}, Dark={StaticResource InputBackgroundDark}}"
+                        Padding="15,5">
+                    <Entry Placeholder="usuario@umad.edu.mx"
+                           Text="{Binding Email}"
+                           Keyboard="Email"
+                           HeightRequest="44"
+                           BackgroundColor="Transparent" />
+                </Border>
+
+                <!-- Matrícula -->
+                <Label Text="Matrícula / ID"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                       Margin="0,8,0,0" />
+                <Border StrokeShape="RoundRectangle 10"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource InputBackgroundLight}, Dark={StaticResource InputBackgroundDark}}"
+                        Padding="15,5">
+                    <Entry Placeholder="Dejar en blanco si eres visitante"
+                           Text="{Binding StudentId}"
+                           Keyboard="Numeric"
+                           HeightRequest="44"
+                           BackgroundColor="Transparent" />
+                </Border>
+
+                <!-- Contraseña -->
+                <Label Text="Contraseña *"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                       Margin="0,8,0,0" />
+                <Border StrokeShape="RoundRectangle 10"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource InputBackgroundLight}, Dark={StaticResource InputBackgroundDark}}"
+                        Padding="15,5">
+                    <Entry Placeholder="Mínimo 8 caracteres"
+                           Text="{Binding Password}"
+                           IsPassword="True"
+                           HeightRequest="44"
+                           BackgroundColor="Transparent" />
+                </Border>
+
+                <!-- Rol -->
+                <Label Text="Rol *"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                       Margin="0,8,0,0" />
+                <Border StrokeShape="RoundRectangle 10"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource InputBackgroundLight}, Dark={StaticResource InputBackgroundDark}}"
+                        Padding="15,2">
+                    <Picker Title="Selecciona tu Rol"
+                            ItemsSource="{Binding Roles}"
+                            ItemDisplayBinding="{Binding RoleName}"
+                            SelectedItem="{Binding Role}"
+                            HeightRequest="44"
+                            BackgroundColor="Transparent" />
+                </Border>
+
+                <Button Text="Crear Cuenta y Solicitar Acceso"
+                        Command="{Binding SaveUserCommand}"
+                        BackgroundColor="{StaticResource SuccessColor}"
+                        TextColor="White"
+                        CornerRadius="10"
+                        HeightRequest="52"
+                        FontSize="16"
+                        FontAttributes="Bold"
+                        Margin="0,20,0,0" />
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
 </ContentPage>
