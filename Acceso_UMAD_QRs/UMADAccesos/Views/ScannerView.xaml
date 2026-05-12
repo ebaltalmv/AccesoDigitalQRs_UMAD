@@ -30,6 +30,20 @@
                        Opacity="0.8"
                        HorizontalOptions="Center" />
 
+                <!-- Indicador de Modo Prueba -->
+                <Border IsVisible="{Binding IsTestMode}"
+                        BackgroundColor="{StaticResource WarningColor}"
+                        Padding="15,4"
+                        HorizontalOptions="Center"
+                        StrokeShape="RoundRectangle 8"
+                        StrokeThickness="0"
+                        Margin="0,-5,0,5">
+                    <Label Text="🧪 MODO PRUEBA ACTIVO"
+                           TextColor="Black"
+                           FontSize="11"
+                           FontAttributes="Bold" />
+                </Border>
+
                 <Border Padding="0"
                         StrokeShape="RoundRectangle 16"
                         StrokeThickness="2">

@@ -48,6 +48,9 @@ namespace UMADAccesos.ViewModels
 
         [ObservableProperty]
         private string _resultMessage = "Apunta la cámara al código QR del usuario.";
+        
+        [ObservableProperty]
+        private bool _isTestMode = false;
 
         public bool IsFormValid => IsAccessPointValid && User != null;
 
@@ -255,25 +258,49 @@ namespace UMADAccesos.ViewModels
         {
             try
             {
-                var token = await _dataContext.AccessTokens
-                                              .Include(t => t.User)
-                                              .FirstOrDefaultAsync(t => t.QrHash == qrHash);
-
-                if (token != null && token.IsActive && token.ExpirationDate > DateTime.Now)
+                if (IsTestMode)
                 {
+                    // Lógica de Modo Prueba: Siempre válido con datos Mock
                     ScanState = 1;
-                    ResultMessage = $"ACCESO CONCEDIDO\n{token.User.FullName}";
+                    
+                    // Intentamos obtener el primer usuario disponible para el registro mock
+                    var mockUser = await _dataContext.Users.FirstOrDefaultAsync();
+                    string userName = mockUser?.FullName ?? "Usuario de Prueba";
+                    
+                    ResultMessage = $"MODO PRUEBA: ACCESO OK\n{userName}";
 
-                    this.User = token.User;
-                    this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Punto Desconocido");
-                    this.Timestamp = DateTime.Now;
-                    await CreateAccessLog();
-                    await GetAccessLogsAsync();
+                    if (mockUser != null)
+                    {
+                        this.User = mockUser;
+                        this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Punto de Prueba");
+                        this.Timestamp = DateTime.Now;
+                        await CreateAccessLog();
+                        await GetAccessLogsAsync();
+                    }
                 }
                 else
                 {
-                    ScanState = 2;
-                    ResultMessage = "ACCESO DENEGADO\nToken Expirado o Inválido.";
+                    // Lógica Normal
+                    var token = await _dataContext.AccessTokens
+                                                  .Include(t => t.User)
+                                                  .FirstOrDefaultAsync(t => t.QrHash == qrHash);
+    
+                    if (token != null && token.IsActive && token.ExpirationDate > DateTime.Now)
+                    {
+                        ScanState = 1;
+                        ResultMessage = $"ACCESO CONCEDIDO\n{token.User.FullName}";
+    
+                        this.User = token.User;
+                        this.AccessPoint = Preferences.Default.Get("CurrentAccessPoint", "Punto Desconocido");
+                        this.Timestamp = DateTime.Now;
+                        await CreateAccessLog();
+                        await GetAccessLogsAsync();
+                    }
+                    else
+                    {
+                        ScanState = 2;
+                        ResultMessage = "ACCESO DENEGADO\nToken Expirado o Inválido.";
+                    }
                 }
             }
             catch (Exception ex)

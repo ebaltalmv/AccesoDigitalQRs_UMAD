@@ -54,6 +54,28 @@
                         </Border>
                     </VerticalStackLayout>
 
+                    <!-- Modo de Prueba -->
+                    <Border StrokeShape="RoundRectangle 12" 
+                            Padding="20,15" 
+                            BackgroundColor="{AppThemeBinding Light=#F1F5F9, Dark=#1E293B}"
+                            StrokeThickness="0">
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                            <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                <Label Text="Modo de Prueba" 
+                                       FontAttributes="Bold" 
+                                       FontSize="16"
+                                       TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+                                <Label Text="Simular accesos válidos sin validar el QR." 
+                                       FontSize="12" 
+                                       TextColor="{StaticResource TextSecondaryLight}" />
+                            </VerticalStackLayout>
+                            <Switch Grid.Column="1" 
+                                    IsToggled="{Binding IsTestMode}"
+                                    OnColor="{StaticResource SuccessColor}"
+                                    ThumbColor="White" />
+                        </Grid>
+                    </Border>
+
                     <Button Text="Comenzar Turno"
                             Command="{Binding StartShiftCommand}"
                             HeightRequest="56"
