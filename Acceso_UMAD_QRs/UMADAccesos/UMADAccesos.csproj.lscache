@@ -24,7 +24,11 @@ ProjectAssetsFile=<PATH>obj/project.assets.json
 RootNamespace=UMADAccesos
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
+<<<<<<< HEAD
 SolutionPath=*Undefined*
+=======
+SolutionPath=<PATH>../UMADAccesos.slnx
+>>>>>>> origin/qr-size
 TargetFrameworkIdentifier=.NETCoreApp
 TargetPath=<PATH>bin/Debug/net10.0-android/UMADAccesos.dll
 TargetRefPath=
@@ -62,9 +66,15 @@ AppShell.xaml.cs
 MauiProgram.cs
 obj/Debug/net10.0-android/
  .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
+<<<<<<< HEAD
  designtime/__Microsoft.Android.Resource.Designer.cs
  UMADAccesos.AssemblyInfo.cs
  UMADAccesos.GlobalUsings.g.cs
+=======
+ UMADAccesos.AssemblyInfo.cs
+ UMADAccesos.GlobalUsings.g.cs
+ __Microsoft.Android.Resource.Designer.cs
+>>>>>>> origin/qr-size
 Platforms/Android/
  MainActivity.cs
  MainApplication.cs
@@ -394,7 +404,11 @@ Views/
  zxing.net.maui.controls/0.7.4/lib/net10.0-android36.0/ZXing.Net.MAUI.Controls.dll
  zxing.net.maui/0.7.4/lib/net10.0-android36.0/ZXing.Net.MAUI.dll
  zxing.net/0.16.11/lib/net9.0/zxing.dll
+<<<<<<< HEAD
 obj/Debug/net10.0-android/designtime/_Microsoft.Android.Resource.Designer.dll
+=======
+obj/Debug/net10.0-android/_Microsoft.Android.Resource.Designer.dll
+>>>>>>> origin/qr-size
 
 [analyzerReferences]
 <DOTNET>/packs/
@@ -465,7 +479,11 @@ ProjectAssetsFile=<PATH>obj/project.assets.json
 RootNamespace=UMADAccesos
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
+<<<<<<< HEAD
 SolutionPath=*Undefined*
+=======
+SolutionPath=<PATH>../UMADAccesos.slnx
+>>>>>>> origin/qr-size
 TargetFrameworkIdentifier=.NETCoreApp
 TargetPath=<PATH>bin/Debug/net10.0-ios/iossimulator-arm64/UMADAccesos.dll
 TargetRefPath=<PATH>obj/Debug/net10.0-ios/iossimulator-arm64/ref/UMADAccesos.dll
@@ -793,6 +811,7 @@ lastDtbSucceeded
 TargetFramework=net10.0-maccatalyst
 
 [properties]
+<<<<<<< HEAD
 AssemblyName=UMADAccesos
 CommandLineArgsForDesignTimeEvaluation=-langversion:14.0 -define:TRACE
 CompilerGeneratedFilesOutputPath=
@@ -806,6 +825,10 @@ TargetFrameworkIdentifier=.NETCoreApp
 TargetPath=<PATH>bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/UMADAccesos.dll
 TargetRefPath=<PATH>obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/ref/UMADAccesos.dll
 TemporaryDependencyNodeTargetIdentifier=net10.0-maccatalyst
+=======
+TargetPath=<PATH>bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/UMADAccesos.dll
+TargetRefPath=<PATH>obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/ref/UMADAccesos.dll
+>>>>>>> origin/qr-size
 
 [commandLineArguments]
 /noconfig

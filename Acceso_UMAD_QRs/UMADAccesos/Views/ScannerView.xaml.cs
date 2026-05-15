@@ -21,7 +21,7 @@ public partial class ScannerView : ContentPage
             status = await Permissions.RequestAsync<Permissions.Camera>();
             if (status != PermissionStatus.Granted)
             {
-                await DisplayAlert("Permiso Requerido", "Se requiere permiso de la cámara para escanear códigos QR.", "Aceptar");
+                await Shell.Current.DisplayAlertAsync("Permiso Requerido", "Se requiere permiso de la cámara para escanear códigos QR.", "Aceptar");
                 return;
             }
         }

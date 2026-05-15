@@ -55,18 +55,21 @@
                    HorizontalOptions="Center" />
 
             <Border Padding="10"
-                    WidthRequest="550"
-                    HeightRequest="550"
+                    MaximumWidthRequest="350"
+                    MaximumHeightRequest="350"
+                    Margin="20"
                     HorizontalOptions="Center"
                     Stroke="{AppThemeBinding Light={StaticResource QrBorderLight}, Dark={StaticResource QrBorderDark}}"
                     BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
                     <VerticalStackLayout
-                        WidthRequest="500"
-                        HeightRequest="500">
+                        HorizontalOptions="Center"
+                        VerticalOptions="Center">
                         <zxing:BarcodeGeneratorView Format="QrCode"
                                                     Value="{Binding QrHash}"
                                                     HorizontalOptions="Center"
                                                     VerticalOptions="Center"
+                                                    WidthRequest="250"
+                                                    HeightRequest="250"
                                                     Margin="10"
                                                     ForegroundColor="Black"
                                                     BackgroundColor="White">

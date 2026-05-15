@@ -37,7 +37,7 @@ namespace UMADAccesos.ViewModels
         private string _locationFilter = "All Locations";
 
         [ObservableProperty]
-        private string _selectedPoint;
+        private string _selectedPoint = string.Empty;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsFormValid))]

@@ -21,7 +21,11 @@ ProjectAssetsFile=<PATH>obj/project.assets.json
 RootNamespace=SharedResources
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
+<<<<<<< HEAD
 SolutionPath=*Undefined*
+=======
+SolutionPath=<PATH>../UMADAccesos.slnx
+>>>>>>> origin/qr-size
 TargetFrameworkIdentifier=.NETCoreApp
 TargetPath=<PATH>bin/Debug/net10.0/SharedResources.dll
 TargetRefPath=<PATH>obj/Debug/net10.0/ref/SharedResources.dll
