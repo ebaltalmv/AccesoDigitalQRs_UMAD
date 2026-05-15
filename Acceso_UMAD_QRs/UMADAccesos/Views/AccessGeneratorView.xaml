@@ -7,69 +7,118 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
              Title="Generar Token de Acceso">
 
-    <VerticalStackLayout Spacing="20"
-                         Padding="30">
-        <Label Text="Configurar Acceso para:"
-               FontSize="14"
-               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-        <Label Text="{Binding User.FullName}"
-               FontSize="24"
-               FontAttributes="Bold"
-               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+    <ScrollView>
+        <Grid HorizontalOptions="Fill"
+              Padding="{OnIdiom Desktop=40, Default=20}"
+              ColumnDefinitions="{OnIdiom Desktop='*, *', Default='*'}"
+              RowDefinitions="{OnIdiom Desktop='*', Default='Auto, Auto'}"
+              ColumnSpacing="40"
+              RowSpacing="20"
+              MaximumWidthRequest="1200">
 
-        <BoxView HeightRequest="1"
-                 Color="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" />
+            <!-- Formulario Principal -->
+            <VerticalStackLayout Grid.Column="0" Spacing="25">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Configurar Acceso para:"
+                           FontSize="14"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    <Label Text="{Binding User.FullName}"
+                           FontSize="32"
+                           FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+                </VerticalStackLayout>
 
-        <Label Text="Tipo de Vigencia:"
-               FontAttributes="Bold"
-               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-        <HorizontalStackLayout Spacing="20">
-            <RadioButton Content="Permanente (Semestre)"
-                         IsChecked="True"
-                         Value="Permanent"
-                         CheckedChanged="OnTypeChanged" />
-            <RadioButton Content="Temporal (Invitado)"
-                         Value="Temporary"
-                         CheckedChanged="OnTypeChanged" />
-        </HorizontalStackLayout>
+                <BoxView HeightRequest="1" Color="{StaticResource BorderLight}" />
 
-        <Label Text="Duración en días (1-365):"
-               FontAttributes="Bold"
-               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-        <Entry Placeholder="ej. 1"
-               Text="{Binding ValidityDays}"
-               Keyboard="Numeric">
-            <Entry.Triggers>
-                <DataTrigger TargetType="Entry"
-                             Binding="{Binding ValidityDays}"
-                             Value="0">
-                    <Setter Property="BackgroundColor"
-                            Value="{AppThemeBinding Light={StaticResource InputErrorLight}, Dark={StaticResource InputErrorDark}}" />
-                </DataTrigger>
-            </Entry.Triggers>
-        </Entry>
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Tipo de Vigencia:"
+                           FontAttributes="Bold"
+                           FontSize="16" />
+                    <Border StrokeShape="RoundRectangle 12" 
+                            Padding="20" 
+                            BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" 
+                            StrokeThickness="0">
+                        <StackLayout Orientation="{OnIdiom Desktop=Horizontal, Default=Vertical}" Spacing="20">
+                            <RadioButton Content="Permanente (Semestre)"
+                                         IsChecked="True"
+                                         Value="Permanent"
+                                         CheckedChanged="OnTypeChanged" />
+                            <RadioButton Content="Temporal (Invitado)"
+                                         Value="Temporary"
+                                         CheckedChanged="OnTypeChanged" />
+                        </StackLayout>
+                    </Border>
+                </VerticalStackLayout>
 
-        <Button Text="Generar y Activar QR"
-                Command="{Binding GenerateTokenCommand}"
-                BackgroundColor="{StaticResource SuccessColor}"
-                TextColor="White"
-                HeightRequest="50"
-                Margin="0,20,0,0">
-            <Button.Triggers>
-                <DataTrigger TargetType="Button"
-                             Binding="{Binding ValidityDays}"
-                             Value="0">
-                    <Setter Property="IsEnabled"
-                            Value="False" />
-                    <Setter Property="BackgroundColor"
-                            Value="{AppThemeBinding Light={StaticResource DisabledLight}, Dark={StaticResource DisabledDark}}" />
-                </DataTrigger>
-            </Button.Triggers>
-        </Button>
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Duración en días (1-365):"
+                           FontAttributes="Bold"
+                           FontSize="16" />
+                    <Border StrokeShape="RoundRectangle 10" 
+                            StrokeThickness="1" 
+                            Stroke="{StaticResource BorderLight}"
+                            Padding="15,2">
+                        <Entry Placeholder="Ejemplo: 30"
+                               Text="{Binding ValidityDays}"
+                               Keyboard="Numeric"
+                               HeightRequest="48"
+                               BackgroundColor="Transparent" />
+                    </Border>
+                </VerticalStackLayout>
 
-        <Label Text="* Una vez activado, el usuario recibirá su QR inmediatamente en la app."
-               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-               FontSize="12"
-               HorizontalOptions="Center" />
-    </VerticalStackLayout>
+                <Button Text="Generar y Activar Código"
+                        Command="{Binding GenerateTokenCommand}"
+                        HeightRequest="56"
+                        FontSize="18"
+                        FontAttributes="Bold"
+                        CornerRadius="12"
+                        Margin="0,10,0,0">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button"
+                                     Binding="{Binding ValidityDays}"
+                                     Value="0">
+                            <Setter Property="IsEnabled" Value="False" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </VerticalStackLayout>
+
+            <!-- Panel de Información / Ayuda -->
+            <VerticalStackLayout Grid.Column="{OnIdiom Desktop=1, Default=0}" 
+                                 Grid.Row="{OnIdiom Desktop=0, Default=1}"
+                                 Spacing="20">
+                <Border StrokeShape="RoundRectangle 16" 
+                        Padding="30" 
+                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                        StrokeThickness="0">
+                    <Border.Shadow>
+                        <Shadow Brush="Black" Offset="0,8" Radius="20" Opacity="0.06" />
+                    </Border.Shadow>
+                    
+                    <VerticalStackLayout Spacing="18">
+                        <Label Text="Información Importante"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource SuccessColor}" />
+                        
+                        <Label Text="• Los tokens permanentes son válidos hasta el fin del ciclo escolar vigente."
+                               FontSize="14" LineHeight="1.4" />
+                        <Label Text="• Los tokens temporales se desactivan automáticamente al expirar su vigencia."
+                               FontSize="14" LineHeight="1.4" />
+                        <Label Text="• El usuario recibirá una notificación push con su nuevo código QR al instante."
+                               FontSize="14" LineHeight="1.4" />
+                        
+                        <BoxView HeightRequest="1" Color="{StaticResource BorderLight}" Margin="0,10" />
+                        
+                        <Label Text="* Una vez generado, el código no puede ser modificado, solo revocado por un administrador."
+                               TextColor="{StaticResource DangerColor}"
+                               FontSize="13"
+                               FontAttributes="Italic"
+                               LineHeight="1.3" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+
+        </Grid>
+    </ScrollView>
 </ContentPage>

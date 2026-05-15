@@ -24,11 +24,7 @@ ProjectAssetsFile=<PATH>obj/project.assets.json
 RootNamespace=UMADAccesos
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
-<<<<<<< HEAD
 SolutionPath=*Undefined*
-=======
-SolutionPath=<PATH>../UMADAccesos.slnx
->>>>>>> origin/qr-size
 TargetFrameworkIdentifier=.NETCoreApp
 TargetPath=<PATH>bin/Debug/net10.0-android/UMADAccesos.dll
 TargetRefPath=
@@ -66,15 +62,9 @@ AppShell.xaml.cs
 MauiProgram.cs
 obj/Debug/net10.0-android/
  .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
-<<<<<<< HEAD
  designtime/__Microsoft.Android.Resource.Designer.cs
  UMADAccesos.AssemblyInfo.cs
  UMADAccesos.GlobalUsings.g.cs
-=======
- UMADAccesos.AssemblyInfo.cs
- UMADAccesos.GlobalUsings.g.cs
- __Microsoft.Android.Resource.Designer.cs
->>>>>>> origin/qr-size
 Platforms/Android/
  MainActivity.cs
  MainApplication.cs
@@ -404,11 +394,7 @@ Views/
  zxing.net.maui.controls/0.7.4/lib/net10.0-android36.0/ZXing.Net.MAUI.Controls.dll
  zxing.net.maui/0.7.4/lib/net10.0-android36.0/ZXing.Net.MAUI.dll
  zxing.net/0.16.11/lib/net9.0/zxing.dll
-<<<<<<< HEAD
 obj/Debug/net10.0-android/designtime/_Microsoft.Android.Resource.Designer.dll
-=======
-obj/Debug/net10.0-android/_Microsoft.Android.Resource.Designer.dll
->>>>>>> origin/qr-size
 
 [analyzerReferences]
 <DOTNET>/packs/
@@ -479,11 +465,7 @@ ProjectAssetsFile=<PATH>obj/project.assets.json
 RootNamespace=UMADAccesos
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
-<<<<<<< HEAD
 SolutionPath=*Undefined*
-=======
-SolutionPath=<PATH>../UMADAccesos.slnx
->>>>>>> origin/qr-size
 TargetFrameworkIdentifier=.NETCoreApp
 TargetPath=<PATH>bin/Debug/net10.0-ios/iossimulator-arm64/UMADAccesos.dll
 TargetRefPath=<PATH>obj/Debug/net10.0-ios/iossimulator-arm64/ref/UMADAccesos.dll
@@ -811,24 +793,8 @@ lastDtbSucceeded
 TargetFramework=net10.0-maccatalyst
 
 [properties]
-<<<<<<< HEAD
-AssemblyName=UMADAccesos
-CommandLineArgsForDesignTimeEvaluation=-langversion:14.0 -define:TRACE
-CompilerGeneratedFilesOutputPath=
-MaxSupportedLangVersion=14.0
-ProjectAssetsFile=<PATH>obj/project.assets.json
-RootNamespace=UMADAccesos
-RunAnalyzers=
-RunAnalyzersDuringLiveAnalysis=
-SolutionPath=*Undefined*
-TargetFrameworkIdentifier=.NETCoreApp
-TargetPath=<PATH>bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/UMADAccesos.dll
-TargetRefPath=<PATH>obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/ref/UMADAccesos.dll
-TemporaryDependencyNodeTargetIdentifier=net10.0-maccatalyst
-=======
-TargetPath=<PATH>bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/UMADAccesos.dll
-TargetRefPath=<PATH>obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/ref/UMADAccesos.dll
->>>>>>> origin/qr-size
+TargetPath=<PATH>bin/Debug/net10.0-maccatalyst/UMADAccesos.dll
+TargetRefPath=<PATH>obj/Debug/net10.0-maccatalyst/ref/UMADAccesos.dll
 
 [commandLineArguments]
 /noconfig
@@ -837,7 +803,6 @@ TargetRefPath=<PATH>obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/ref/UMADAcce
 /nowarn:1701,1702,1701,1702,8002
 /fullpaths
 /nostdlib+
-/platform:arm64
 /errorreport:prompt
 /warn:10
 /define:__MACCATALYST__;__IOS__;__MOBILE__;__UNIFIED__;TRACE;DEBUG;NET;NET10_0;NETCOREAPP;MACCATALYST;MACCATALYST26_2;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NET9_0_OR_GREATER;NET10_0_OR_GREATER;NETCOREAPP1_0_OR_GREATER;NETCOREAPP1_1_OR_GREATER;NETCOREAPP2_0_OR_GREATER;NETCOREAPP2_1_OR_GREATER;NETCOREAPP2_2_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;MACCATALYST13_1_OR_GREATER;MACCATALYST13_2_OR_GREATER;MACCATALYST13_3_OR_GREATER;MACCATALYST13_4_OR_GREATER;MACCATALYST13_5_OR_GREATER;MACCATALYST14_2_OR_GREATER;MACCATALYST14_3_OR_GREATER;MACCATALYST14_4_OR_GREATER;MACCATALYST14_5_OR_GREATER;MACCATALYST15_0_OR_GREATER;MACCATALYST15_2_OR_GREATER;MACCATALYST15_4_OR_GREATER;MACCATALYST16_1_OR_GREATER;MACCATALYST16_2_OR_GREATER;MACCATALYST16_4_OR_GREATER;MACCATALYST17_0_OR_GREATER;MACCATALYST17_2_OR_GREATER;MACCATALYST17_4_OR_GREATER;MACCATALYST17_5_OR_GREATER;MACCATALYST18_0_OR_GREATER;MACCATALYST18_1_OR_GREATER;MACCATALYST18_2_OR_GREATER;MACCATALYST18_3_OR_GREATER;MACCATALYST18_4_OR_GREATER;MACCATALYST18_5_OR_GREATER;MACCATALYST26_0_OR_GREATER;MACCATALYST26_1_OR_GREATER;MACCATALYST26_2_OR_GREATER
@@ -848,8 +813,8 @@ TargetRefPath=<PATH>obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/ref/UMADAcce
 /debug:portable
 /filealign:512
 /optimize-
-/out:obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/UMADAccesos.dll
-/refout:obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/refint/UMADAccesos.dll
+/out:obj/Debug/net10.0-maccatalyst/UMADAccesos.dll
+/refout:obj/Debug/net10.0-maccatalyst/refint/UMADAccesos.dll
 /target:exe
 /warnaserror-
 /utf8output
@@ -861,7 +826,7 @@ TargetRefPath=<PATH>obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/ref/UMADAcce
 App.xaml.cs
 AppShell.xaml.cs
 MauiProgram.cs
-obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/
+obj/Debug/net10.0-maccatalyst/
  .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
  UMADAccesos.AssemblyInfo.cs
  UMADAccesos.GlobalUsings.g.cs
@@ -1121,7 +1086,7 @@ Views/
 
 [analyzerConfigFiles]
 <DOTNET>/sdk/10.0.202/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_10_default.globalconfig
-obj/Debug/net10.0-maccatalyst/maccatalyst-arm64/UMADAccesos.GeneratedMSBuildEditorConfig.editorconfig
+obj/Debug/net10.0-maccatalyst/UMADAccesos.GeneratedMSBuildEditorConfig.editorconfig
 
 [additionalFiles]
 App.xaml

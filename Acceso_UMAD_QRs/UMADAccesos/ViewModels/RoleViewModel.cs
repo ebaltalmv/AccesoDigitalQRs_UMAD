@@ -42,7 +42,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Connection Error", $"Could not fetch roles: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los roles: {ex.Message}", "Aceptar");
             }
         }
 
@@ -65,7 +65,7 @@ namespace UMADAccesos.ViewModels
                 if (foundRole != null)
                 {
                     await EditRole(foundRole);
-                    await Shell.Current.DisplayAlertAsync("Edit Success", "The record has been edited successfully", "OK");
+                    await Shell.Current.DisplayAlertAsync("Edición Exitosa", "El registro ha sido editado con éxito", "Aceptar");
                     await Shell.Current.GoToAsync("..");
                     return;
                 }
@@ -74,7 +74,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not save role: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo guardar el rol: {ex.Message}", "Aceptar");
             }
         }
 
@@ -92,7 +92,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not create role: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo crear el rol: {ex.Message}", "Aceptar");
             }
         }
 
@@ -107,7 +107,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not edit role: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo editar el rol: {ex.Message}", "Aceptar");
             }
         }
 
@@ -131,8 +131,8 @@ namespace UMADAccesos.ViewModels
         [RelayCommand]
         public async Task DeleteRole(RoleModel role)
         {
-            string userAnswer = await Shell.Current.DisplayActionSheetAsync("Are you sure you want to delete this role?", "Cancel", "Delete");
-            if (userAnswer == "Cancel") return;
+            string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estás seguro de que quieres eliminar este rol?", "Cancelar", "Eliminar");
+            if (userAnswer == "Cancelar") return;
 
             try
             {
@@ -150,7 +150,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not delete role: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo eliminar el rol: {ex.Message}", "Aceptar");
             }
         }
 

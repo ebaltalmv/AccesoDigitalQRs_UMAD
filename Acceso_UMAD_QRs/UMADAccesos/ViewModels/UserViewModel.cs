@@ -85,7 +85,7 @@ namespace UMADAccesos.ViewModels
             catch (Exception ex)
             {
                 if (Application.Current?.Windows.Count > 0 && Application.Current.Windows[0].Page != null)
-                    await Application.Current.Windows[0].Page!.DisplayAlertAsync("Connection Error", $"Could not fetch users: {ex.Message}", "OK");
+                    await Application.Current.Windows[0].Page!.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los usuarios: {ex.Message}", "Aceptar");
             }
         }
 
@@ -99,7 +99,7 @@ namespace UMADAccesos.ViewModels
             catch (Exception ex)
             {
                 if (Application.Current?.Windows.Count > 0 && Application.Current.Windows[0].Page != null)
-                    await Application.Current.Windows[0].Page!.DisplayAlertAsync("Connection Error", $"Could not fetch roles: {ex.Message}", "OK");
+                    await Application.Current.Windows[0].Page!.DisplayAlertAsync("Error de Conexión", $"No se pudieron obtener los roles: {ex.Message}", "Aceptar");
             }
         }
 
@@ -167,17 +167,17 @@ namespace UMADAccesos.ViewModels
                 if (foundUser != null)
                 {
                     await EditUser(foundUser);
-                    await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Edit Success", "The record has been edited successfully", "OK");
+                    await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Edición Exitosa", "El registro ha sido editado con éxito", "Aceptar");
                     await Application.Current!.Windows[0].Page!.Navigation.PopAsync();
                     return;
                 }
                 await CreateUser();
-                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Success", "User registered successfully", "OK");
+                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Éxito", "Usuario registrado con éxito", "Aceptar");
                 await Application.Current!.Windows[0].Page!.Navigation.PopAsync();
             }
             catch (Exception ex)
             {
-                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Database Error", $"Could not save user: {ex.Message}", "OK");
+                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error de Base de Datos", $"No se pudo guardar el usuario: {ex.Message}", "Aceptar");
             }
         }
 
@@ -233,8 +233,8 @@ namespace UMADAccesos.ViewModels
         [RelayCommand]
         public async Task DeleteUser(UserModel user)
         {
-            string userAnswer = await Shell.Current.DisplayActionSheetAsync("Are you sure you want to delete this user?", "Cancel", "Delete");
-            if (userAnswer == "Cancel") return;
+            string userAnswer = await Shell.Current.DisplayActionSheetAsync("¿Estás seguro de que quieres eliminar este usuario?", "Cancelar", "Eliminar");
+            if (userAnswer == "Cancelar") return;
 
             try
             {
@@ -252,7 +252,7 @@ namespace UMADAccesos.ViewModels
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlertAsync("Database Error", $"Could not delete user: {ex.Message}", "OK");
+                await Shell.Current.DisplayAlertAsync("Error de Base de Datos", $"No se pudo eliminar el usuario: {ex.Message}", "Aceptar");
             }
         }
 
@@ -271,7 +271,7 @@ namespace UMADAccesos.ViewModels
         {
             if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
             {
-                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error", "Enter email and password", "OK");
+                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error", "Ingresa correo y contraseña", "Aceptar");
                 return;
             }
 
@@ -290,12 +290,12 @@ namespace UMADAccesos.ViewModels
                 }
                 else
                 {
-                    await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error", "Invalid credentials", "OK");
+                    await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error", "Credenciales inválidas", "Aceptar");
                 }
             }
             catch (Exception ex)
             {
-                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Connection Error", $"Problem connecting to database: {ex.Message}", "OK");
+                await Application.Current!.Windows[0].Page!.DisplayAlertAsync("Error de Conexión", $"Problema al conectar con la base de datos: {ex.Message}", "Aceptar");
             }
         }
 

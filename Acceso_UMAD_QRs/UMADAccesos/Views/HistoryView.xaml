@@ -8,91 +8,123 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
              Title="Historial de Accesos">
 
-    <Grid RowDefinitions="Auto, *">
+    <Grid RowDefinitions="Auto, *"
+          HorizontalOptions="Fill">
+        <Grid.MaximumWidthRequest>
+            <OnIdiom Desktop="1200" Default="10000" />
+        </Grid.MaximumWidthRequest>
 
-        <VerticalStackLayout Grid.Row="0"
-                             Padding="15"
-                             Spacing="10"
-                             BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
-            <Label Text="Registro de Seguridad"
-                   FontSize="22"
-                   FontAttributes="Bold"
-                   TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+        <!-- Header con Filtros -->
+        <Border Grid.Row="0"
+                StrokeThickness="0"
+                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                Padding="{OnIdiom Desktop='40, 30', Default='20, 15'}"
+                HorizontalOptions="Fill">
+            <Border.Shadow>
+                <Shadow Brush="Black" Offset="0,2" Radius="10" Opacity="0.05" />
+            </Border.Shadow>
+            
+            <VerticalStackLayout Spacing="20">
+                <Label Text="Registro de Seguridad"
+                       FontSize="28"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
 
-            <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" RowSpacing="10" ColumnSpacing="10">
-                <SearchBar Grid.Row="0" Grid.ColumnSpan="2"
-                           Placeholder="Buscar por nombre o matrícula..."
-                           Text="{Binding SearchFilter}" />
-                           
-                <Picker Grid.Row="1" Grid.Column="0"
-                        Title="Todas las Ubicaciones"
-                        ItemsSource="{Binding LocationFilters}"
-                        SelectedItem="{Binding LocationFilter}" />
-                        
-                <Button Grid.Row="1" Grid.Column="1"
-                        Text="Filtrar"
-                        Command="{Binding FilterHistoryCommand}"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}"
-                        TextColor="White"
-                        Padding="10,0" />
-            </Grid>
-        </VerticalStackLayout>
+                <Grid ColumnDefinitions="{OnIdiom Desktop='*, 300, Auto', Default='*'}" 
+                      RowDefinitions="{OnIdiom Desktop='Auto', Default='Auto, Auto, Auto'}" 
+                      RowSpacing="{OnIdiom Desktop=0, Default=12}" 
+                      ColumnSpacing="15">
+                    
+                    <SearchBar x:Name="SearchInput"
+                               Grid.Row="0" 
+                               Grid.Column="0"
+                               Placeholder="Buscar por nombre o ID..."
+                               Text="{Binding SearchFilter}"
+                               HeightRequest="48"
+                               BackgroundColor="{AppThemeBinding Light=White, Dark=#1E293B}" />
+                               
+                    <Picker x:Name="LocationPicker"
+                            Grid.Row="{OnIdiom Desktop=0, Default=1}" 
+                            Grid.Column="{OnIdiom Desktop=1, Default=0}"
+                            Title="Filtrar por Ubicación"
+                            ItemsSource="{Binding LocationFilters}"
+                            SelectedItem="{Binding LocationFilter}"
+                            HeightRequest="48" />
+                            
+                    <Button x:Name="FilterBtn"
+                            Grid.Row="{OnIdiom Desktop=0, Default=2}" 
+                            Grid.Column="{OnIdiom Desktop=2, Default=0}"
+                            Text="Aplicar Filtros"
+                            Command="{Binding FilterHistoryCommand}"
+                            Padding="25,0"
+                            HeightRequest="48"
+                            CornerRadius="8"
+                            BackgroundColor="{StaticResource SecondaryAccent}"
+                            TextColor="White" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
 
         <CollectionView Grid.Row="1"
                         ItemsSource="{Binding AccessLogs}"
-                        Margin="10,10,10,0">
+                        HorizontalOptions="Fill"
+                        Margin="{OnIdiom Desktop=40, Default=15}">
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" 
+                                 Span="{OnIdiom Desktop=2, Default=1}" 
+                                 HorizontalItemSpacing="20" 
+                                 VerticalItemSpacing="15" />
+            </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:AccessLogModel">
-                    <Border Margin="0,0,0,10"
-                            Padding="10"
-                            Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
-                            StrokeThickness="1"
-                            StrokeShape="RoundRectangle 8"
-                            BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
+                    <Border StrokeShape="RoundRectangle 16"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"
+                            Padding="15"
+                            StrokeThickness="0">
+                        <Border.Shadow>
+                            <Shadow Brush="Black" Offset="0,4" Radius="10" Opacity="0.06" />
+                        </Border.Shadow>
 
-                        <Grid ColumnDefinitions="Auto, *, Auto"
-                              RowDefinitions="Auto, Auto">
-
-                            <BoxView Grid.RowSpan="2"
-                                     Grid.Column="0"
-                                     WidthRequest="6"
-                                     Margin="0,0,15,0"
-                                     CornerRadius="3"
+                        <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12">
+                            <BoxView Grid.Column="0"
+                                     WidthRequest="4"
+                                     CornerRadius="2"
                                      Color="{StaticResource SuccessColor}">
                             </BoxView>
 
-                            <Label Grid.Row="0"
-                                   Grid.Column="1"
-                                   Text="{Binding User.FullName}"
-                                   FontAttributes="Bold"
-                                   TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
-                                   FontSize="16" />
-                            <Label Grid.Row="1"
-                                   Grid.Column="1"
-                                   Text="{Binding User.StudentId}"
-                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                                   FontSize="12" />
-
-                            <VerticalStackLayout Grid.RowSpan="2"
-                                                 Grid.Column="2"
-                                                 HorizontalOptions="End"
-                                                 VerticalOptions="Center">
-                                <Label Text="{Binding AccessPoint}"
-                                       FontSize="12"
+                            <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                                <Label Text="{Binding User.FullName}"
                                        FontAttributes="Bold"
-                                       HorizontalOptions="End"
-                                       TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
-                                <Label Text="{Binding Timestamp, StringFormat='{0:HH:mm hrs - dd/MM}'}"
-                                       FontSize="12"
+                                       FontSize="16"
+                                       LineBreakMode="WordWrap" />
+                                <Label Text="{Binding User.StudentId}"
+                                       TextColor="{StaticResource TextSecondaryLight}"
+                                       FontSize="13" />
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Grid.Column="2"
+                                                 HorizontalOptions="End"
+                                                 VerticalOptions="Center"
+                                                 Spacing="6">
+                                <Border BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+                                        StrokeThickness="0"
+                                        Padding="8,2"
+                                        HorizontalOptions="End"
+                                        StrokeShape="RoundRectangle 6">
+                                    <Label Text="{Binding AccessPoint}"
+                                           FontSize="10"
+                                           FontAttributes="Bold"
+                                           TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+                                </Border>
+                                <Label Text="{Binding Timestamp, StringFormat='{0:HH:mm}'}"
+                                       FontSize="11"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                        HorizontalOptions="End" />
                             </VerticalStackLayout>
-
                         </Grid>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
-
     </Grid>
 </ContentPage>

@@ -24,23 +24,23 @@ namespace UMADAccesos
 
             var role = App.CurrentUser.Role.RoleName.ToLower();
 
-            var myQrItem = new FlyoutItem { Title = "My QR Code" };
+            var myQrItem = new FlyoutItem { Title = "Mi Código QR" };
             myQrItem.Items.Add(new ShellContent { ContentTemplate = new DataTemplate(typeof(MyQRView)), Route = "MyQRView" });
             this.Items.Add(myQrItem);
 
             if (role.Contains("guardia") || role.Contains("seguridad") || role.Contains("admin") || role.Contains("lector"))
             {
-                var shiftItem = new FlyoutItem { Title = "Guard Shift" };
+                var shiftItem = new FlyoutItem { Title = "Turno de Guardia" };
                 shiftItem.Items.Add(new ShellContent { ContentTemplate = new DataTemplate(typeof(AccessPointSetupView)), Route = "AccessPointSetupView" });
                 this.Items.Add(shiftItem);
 
-                var adminItem = new FlyoutItem { Title = "Administration" };
-                adminItem.Items.Add(new Tab { Title = "Approvals", Items = { new ShellContent { ContentTemplate = new DataTemplate(typeof(ApprovalsView)), Route = "ApprovalsView" } } });
-                adminItem.Items.Add(new Tab { Title = "History", Items = { new ShellContent { ContentTemplate = new DataTemplate(typeof(HistoryView)), Route = "HistoryView" } } });
+                var adminItem = new FlyoutItem { Title = "Administración" };
+                adminItem.Items.Add(new Tab { Title = "Aprobaciones", Items = { new ShellContent { ContentTemplate = new DataTemplate(typeof(ApprovalsView)), Route = "ApprovalsView" } } });
+                adminItem.Items.Add(new Tab { Title = "Historial", Items = { new ShellContent { ContentTemplate = new DataTemplate(typeof(HistoryView)), Route = "HistoryView" } } });
                 this.Items.Add(adminItem);
             }
 
-            var logoutItem = new MenuItem { Text = "Log Out" };
+            var logoutItem = new MenuItem { Text = "Cerrar Sesión" };
             logoutItem.Clicked += async (s, e) =>
             {
                 App.CurrentUser = null;

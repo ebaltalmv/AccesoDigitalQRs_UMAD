@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- Actualizado por Antigravity -->
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:UMADAccesos.ViewModels"
@@ -8,85 +9,213 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
              Title="Escanear Código QR">
 
-    <Grid RowDefinitions="Auto, *, Auto">
+    <Grid ColumnDefinitions="{OnIdiom Desktop='*, Auto, *', Default='*'}"
+          RowDefinitions="{OnIdiom Desktop='*', Default='Auto, *'}"
+          Padding="0">
 
-        <Label Grid.Row="0"
-               Text="Punto de Acceso Activo"
-               HorizontalOptions="Center"
-               Margin="10"
-               FontAttributes="Bold"
-               TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+        <!-- Panel Cámara -->
+        <Grid Grid.Column="0"
+              Grid.Row="0"
+              BackgroundColor="{AppThemeBinding Light=#0A1628, Dark=#050D1A}"
+              Padding="{OnIdiom Desktop=30, Default=20}">
+            <VerticalStackLayout VerticalOptions="Center"
+                                 HorizontalOptions="Center"
+                                 Spacing="16"
+                                 MaximumWidthRequest="{OnIdiom Desktop=500, Default=600}">
 
-        <Border Grid.Row="1"
-                Margin="20"
-                Padding="0"
-                StrokeShape="RoundRectangle 15">
-            <Border.Triggers>
-                <DataTrigger TargetType="Border"
-                             Binding="{Binding ScanState}"
-                             Value="0">
-                    <Setter Property="BackgroundColor"
-                            Value="{AppThemeBinding Light=LightGray, Dark=#2D3748}" />
-                </DataTrigger>
-                <DataTrigger TargetType="Border"
-                             Binding="{Binding ScanState}"
-                             Value="1">
-                    <Setter Property="BackgroundColor"
-                            Value="{StaticResource SuccessColor}" />
-                </DataTrigger>
-                <DataTrigger TargetType="Border"
-                             Binding="{Binding ScanState}"
-                             Value="2">
-                    <Setter Property="BackgroundColor"
-                            Value="{StaticResource DangerColor}" />
-                </DataTrigger>
-            </Border.Triggers>
-
-            <Grid RowDefinitions="*, Auto">
-                <zxing:CameraBarcodeReaderView Grid.Row="0"
-                                               x:Name="barcodeReader"
-                                               BarcodesDetected="CameraBarcodeReaderView_BarcodesDetected"
-                                               IsDetecting="True"
-                                               WidthRequest="300"
-                                               HeightRequest="300"
-                                               HorizontalOptions="Center"
-                                               VerticalOptions="Center"
-                                               Margin="10">
-                    <zxing:CameraBarcodeReaderView.Triggers>
-                        <DataTrigger TargetType="zxing:CameraBarcodeReaderView"
-                                     Binding="{Binding ScanState}"
-                                     Value="1">
-                            <Setter Property="IsVisible"
-                                    Value="False" />
-                        </DataTrigger>
-                        <DataTrigger TargetType="zxing:CameraBarcodeReaderView"
-                                     Binding="{Binding ScanState}"
-                                     Value="2">
-                            <Setter Property="IsVisible"
-                                    Value="False" />
-                        </DataTrigger>
-                    </zxing:CameraBarcodeReaderView.Triggers>
-                </zxing:CameraBarcodeReaderView>
-
-                <Label Grid.Row="1"
-                       Text="{Binding ResultMessage}"
-                       FontSize="18"
-                       HorizontalTextAlignment="Center"
-                       VerticalOptions="Center"
-                       Margin="20"
+                <Label Text="📷 Cámara de Escaneo"
+                       FontSize="16"
                        FontAttributes="Bold"
-                       TextColor="White">
-                    <Label.Triggers>
-                        <DataTrigger TargetType="Label"
-                                     Binding="{Binding ScanState}"
-                                     Value="0">
-                            <Setter Property="TextColor"
-                                    Value="{AppThemeBinding Light=Black, Dark=White}" />
-                        </DataTrigger>
-                    </Label.Triggers>
-                </Label>
-            </Grid>
-        </Border>
+                       TextColor="White"
+                       Opacity="0.8"
+                       HorizontalOptions="Center" />
 
+                <!-- Indicador de Modo Prueba -->
+                <Border IsVisible="{Binding IsTestMode}"
+                        BackgroundColor="{StaticResource WarningColor}"
+                        Padding="15,4"
+                        HorizontalOptions="Center"
+                        StrokeShape="RoundRectangle 8"
+                        StrokeThickness="0"
+                        Margin="0,-5,0,5">
+                    <Label Text="🧪 MODO PRUEBA ACTIVO"
+                           TextColor="Black"
+                           FontSize="11"
+                           FontAttributes="Bold" />
+                </Border>
+
+                <Border Padding="0"
+                        StrokeShape="RoundRectangle 16"
+                        StrokeThickness="2">
+                    <Border.Triggers>
+                        <DataTrigger TargetType="Border" Binding="{Binding ScanState}" Value="0">
+                            <Setter Property="Stroke" Value="#334155" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="Border" Binding="{Binding ScanState}" Value="1">
+                            <Setter Property="Stroke" Value="{StaticResource SuccessColor}" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="Border" Binding="{Binding ScanState}" Value="2">
+                            <Setter Property="Stroke" Value="{StaticResource DangerColor}" />
+                        </DataTrigger>
+                    </Border.Triggers>
+
+                    <Grid RowDefinitions="*, Auto"
+                          HeightRequest="{OnIdiom Desktop=400, Default=300}">
+                        <zxing:CameraBarcodeReaderView Grid.Row="0"
+                                                       x:Name="barcodeReader"
+                                                       BarcodesDetected="CameraBarcodeReaderView_BarcodesDetected"
+                                                       IsDetecting="True"
+                                                       HorizontalOptions="Fill"
+                                                       VerticalOptions="Fill">
+                            <zxing:CameraBarcodeReaderView.Triggers>
+                                <DataTrigger TargetType="zxing:CameraBarcodeReaderView"
+                                             Binding="{Binding ScanState}" Value="1">
+                                    <Setter Property="IsVisible" Value="False" />
+                                </DataTrigger>
+                                <DataTrigger TargetType="zxing:CameraBarcodeReaderView"
+                                             Binding="{Binding ScanState}" Value="2">
+                                    <Setter Property="IsVisible" Value="False" />
+                                </DataTrigger>
+                            </zxing:CameraBarcodeReaderView.Triggers>
+                        </zxing:CameraBarcodeReaderView>
+
+                        <Grid Grid.Row="0" IsVisible="False">
+                            <Grid.Triggers>
+                                <DataTrigger TargetType="Grid" Binding="{Binding ScanState}" Value="1">
+                                    <Setter Property="IsVisible" Value="True" />
+                                </DataTrigger>
+                                <DataTrigger TargetType="Grid" Binding="{Binding ScanState}" Value="2">
+                                    <Setter Property="IsVisible" Value="True" />
+                                </DataTrigger>
+                            </Grid.Triggers>
+                            <BoxView>
+                                <BoxView.Triggers>
+                                    <DataTrigger TargetType="BoxView" Binding="{Binding ScanState}" Value="1">
+                                        <Setter Property="Color" Value="{StaticResource SuccessColor}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="BoxView" Binding="{Binding ScanState}" Value="2">
+                                        <Setter Property="Color" Value="{StaticResource DangerColor}" />
+                                    </DataTrigger>
+                                </BoxView.Triggers>
+                            </BoxView>
+                            <Label Text="{Binding ResultMessage}"
+                                   FontSize="24"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"
+                                   HorizontalTextAlignment="Center"
+                                   Margin="20" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Label Text="Apunta la cámara al código QR"
+                       FontSize="13"
+                       TextColor="White"
+                       Opacity="0.5"
+                       HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Grid>
+
+        <BoxView Grid.Column="1"
+                 IsVisible="{OnIdiom Desktop=True, Default=False}"
+                 WidthRequest="1"
+                 BackgroundColor="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                 VerticalOptions="Fill" />
+
+        <ScrollView Grid.Column="{OnIdiom Desktop=2, Default=0}"
+                    Grid.Row="{OnIdiom Desktop=0, Default=1}">
+            <VerticalStackLayout Spacing="20"
+                                 Padding="{OnIdiom Desktop=40, Default=25}"
+                                 VerticalOptions="Center"
+                                 MaximumWidthRequest="{OnIdiom Desktop=460, Default=600}">
+
+                <Label Text="Punto de Control"
+                       FontSize="22"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+
+                <Border StrokeShape="RoundRectangle 16"
+                        StrokeThickness="0"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"
+                        Padding="20">
+                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="14">
+                        <BoxView Grid.Column="0"
+                                 WidthRequest="6"
+                                 VerticalOptions="Fill"
+                                 CornerRadius="3"
+                                 Color="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="Ubicación Actual"
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            <Label Text="{Binding AccessPoint}"
+                                   FontSize="18"
+                                   FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource PrimaryAccent}, Dark={StaticResource PrimaryAccentDark}}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <Border StrokeShape="RoundRectangle 16"
+                        StrokeThickness="1"
+                        Padding="25">
+                    <Border.Triggers>
+                        <DataTrigger TargetType="Border" Binding="{Binding ScanState}" Value="0">
+                            <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" />
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="Border" Binding="{Binding ScanState}" Value="1">
+                            <Setter Property="Stroke" Value="{StaticResource SuccessColor}" />
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource StatusApprovedLight}, Dark={StaticResource StatusApprovedDark}}" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="Border" Binding="{Binding ScanState}" Value="2">
+                            <Setter Property="Stroke" Value="{StaticResource DangerColor}" />
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource StatusExpiredLight}, Dark={StaticResource StatusExpiredDark}}" />
+                        </DataTrigger>
+                    </Border.Triggers>
+
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Estado"
+                               FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        <Label FontSize="22"
+                               FontAttributes="Bold">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding ScanState}" Value="0">
+                                    <Setter Property="Text" Value="⏳ Listo para Escanear" />
+                                    <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                                </DataTrigger>
+                                <DataTrigger TargetType="Label" Binding="{Binding ScanState}" Value="1">
+                                    <Setter Property="Text" Value="✅ ACCESO PERMITIDO" />
+                                    <Setter Property="TextColor" Value="{StaticResource SuccessColor}" />
+                                </DataTrigger>
+                                <DataTrigger TargetType="Label" Binding="{Binding ScanState}" Value="2">
+                                    <Setter Property="Text" Value="❌ ACCESO DENEGADO" />
+                                    <Setter Property="TextColor" Value="{StaticResource DangerColor}" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border StrokeShape="RoundRectangle 16"
+                        StrokeThickness="0"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                        Padding="25">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Guía de Escaneo"
+                            
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                        <Label Text="• Coloca el código QR dentro del recuadro." FontSize="13" />
+                        <Label Text="• Evita reflejos de luz." FontSize="13" />
+                        <Label Text="• El sistema validará al instante." FontSize="13" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
     </Grid>
 </ContentPage>
