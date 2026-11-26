@@ -1,10 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+namespace SharedResources.Models;
 
-namespace SharedResources.Models
+public class RoleModel
 {
-    internal class RoleModel
-    {
-    }
+    public int IdRole { get; set; }
+
+    public string RoleName { get; set; } = string.Empty;
+
+    public ICollection<UserModel> Users { get; set; } = [];
 }
