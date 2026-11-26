@@ -1,0 +1,156 @@
+:root {
+    --umad-navy: #003366;
+    --umad-surface: #f5f7fa;
+    --umad-card: #ffffff;
+    --umad-border: #d9e1ea;
+    --umad-text: #1c2430;
+    --umad-muted: #5a6675;
+    --umad-ok: #1b7f46;
+    --umad-warn: #b25e09;
+    --umad-err: #b42318;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--umad-surface);
+    color: var(--umad-text);
+    line-height: 1.45;
+}
+
+.loading-shell {
+    padding: 2rem;
+    text-align: center;
+    color: var(--umad-navy);
+    font-weight: 600;
+}
+
+.app-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-header {
+    background-color: var(--umad-navy);
+    color: #ffffff;
+    padding: 0.9rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.app-header h1 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.app-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.app-main {
+    flex: 1;
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1.25rem;
+}
+
+.diag-card {
+    background: var(--umad-card);
+    border: 1px solid var(--umad-border);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.diag-card h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    color: var(--umad-navy);
+}
+
+.diag-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.75rem;
+}
+
+.diag-metric {
+    border: 1px solid var(--umad-border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    background: var(--umad-surface);
+}
+
+.diag-metric .label {
+    font-size: 0.78rem;
+    color: var(--umad-muted);
+    display: block;
+}
+
+.diag-metric .value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--umad-text);
+}
+
+.status-ok {
+    color: var(--umad-ok);
+    font-weight: 600;
+}
+
+.status-warn {
+    color: var(--umad-warn);
+    font-weight: 600;
+}
+
+.status-err {
+    color: var(--umad-err);
+    font-weight: 600;
+}
+
+.btn-refresh {
+    background-color: var(--umad-navy);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 0.95rem;
+    font-size: 0.88rem;
+    cursor: pointer;
+}
+
+.btn-refresh:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#blazor-error-ui {
+    background: #fff3cd;
+    color: #664d03;
+    bottom: 0;
+    box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.18);
+    display: none;
+    left: 0;
+    padding: 0.65rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.55rem;
+}

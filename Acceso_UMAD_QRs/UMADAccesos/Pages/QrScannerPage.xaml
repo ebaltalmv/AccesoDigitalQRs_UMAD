@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+             x:Class="UMADAccesos.Pages.QrScannerPage"
+             Title="Escanear Código QR"
+             BackgroundColor="Black">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Barra superior con botón de cerrar -->
+        <Grid Grid.Row="0"
+              Padding="16,8"
+              BackgroundColor="#003366">
+            <Label Text="Escanear Código QR"
+                   TextColor="White"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   VerticalOptions="Center"
+                   HorizontalOptions="Start" />
+            <Button Text="✕"
+                    TextColor="White"
+                    BackgroundColor="Transparent"
+                    FontSize="22"
+                    HorizontalOptions="End"
+                    VerticalOptions="Center"
+                    Clicked="OnCerrarClicked" />
+        </Grid>
+
+        <!-- Vista de cámara para escaneo de código de barras -->
+        <zxing:CameraBarcodeReaderView x:Name="BarcodeReader"
+                                        Grid.Row="1"
+                                        IsDetecting="False"
+                                        BarcodesDetected="OnBarcodesDetected" />
+
+        <!-- Instrucción inferior -->
+        <Label Grid.Row="2"
+               Text="Apunte la cámara al código QR"
+               TextColor="White"
+               FontSize="16"
+               HorizontalTextAlignment="Center"
+               Padding="16,12"
+               BackgroundColor="#80000000" />
+
+    </Grid>
+</ContentPage>
