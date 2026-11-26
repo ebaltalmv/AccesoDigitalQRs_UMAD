@@ -1,17 +1,29 @@
-using UMADAccesos.ViewModels;
-using UMADAccesos.Views;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using SharedResources.Data;
+using UMADAccesos.Data;
+using UMADAccesos.Extensions;
 using ZXing.Net.Maui.Controls;
 
 namespace UMADAccesos
 {
+    /// <summary>
+    /// Configura el contenedor de dependencias, el host Blazor Hybrid, el soporte de escáner ZXing y la inicialización local.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     public static class MauiProgram
     {
+        /// <summary>
+        /// Construye y configura la instancia principal de la aplicación .NET MAUI Blazor Hybrid.
+        /// </summary>
+        /// <author>Emmanuel Baltazar López</author>
+        /// <date>25/11/2026</date>
+        /// <version>1.0</version>
+        /// <modification>25/11/2026</modification>
         public static MauiApp CreateMauiApp()
         {
-            var builder = MauiApp.CreateBuilder();
+            MauiAppBuilder builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
                 .UseBarcodeReader()
@@ -21,35 +33,19 @@ namespace UMADAccesos
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
-            string dbPath = Path.Combine(FileSystem.AppDataDirectory, "UmadLocal.db");
-
-            builder.Services.AddDbContext<UmadDbContext>(options =>
-                options.UseSqlite($"Filename={dbPath}"));
-
-            builder.Services.AddTransient<LoginView>();
-            builder.Services.AddTransient<SignUpView>();
-            builder.Services.AddTransient<MyQRView>();
-            builder.Services.AddTransient<AccessPointSetupView>();
-            builder.Services.AddTransient<ScannerView>();
-            builder.Services.AddTransient<ApprovalsView>();
-            builder.Services.AddTransient<AccessGeneratorView>();
-            builder.Services.AddTransient<HistoryView>();
-
-            builder.Services.AddTransient<UserViewModel>();
-            builder.Services.AddTransient<RoleViewModel>();
-            builder.Services.AddSingleton<AccessLogViewModel>();
-            builder.Services.AddTransient<AccessTokenViewModel>();
+            builder.Services.AddMauiBlazorWebView();
 
 #if DEBUG
+            builder.Services.AddBlazorWebViewDeveloperTools();
             builder.Logging.AddDebug();
 #endif
 
-            var app = builder.Build();
-            using (var scope = app.Services.CreateScope())
-            {
-                var dbContext = scope.ServiceProvider.GetRequiredService<UmadDbContext>();
-                dbContext.Database.EnsureCreated();
-            }
+            builder.Services.AddUmadCore();
+
+            MauiApp app = builder.Build();
+
+            IUmadDbInitializer dbInitializer = app.Services.GetRequiredService<IUmadDbInitializer>();
+            Task.Run(() => dbInitializer.InitializeAsync()).GetAwaiter().GetResult();
 
             return app;
         }

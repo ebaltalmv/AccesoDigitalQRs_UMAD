@@ -1,0 +1,14 @@
+<Router AppAssembly="@typeof(MauiProgram).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <section class="diag-card">
+                <h2>Ruta no encontrada</h2>
+                <p>La vista solicitada no está disponible en la fase actual.</p>
+            </section>
+        </LayoutView>
+    </NotFound>
+</Router>

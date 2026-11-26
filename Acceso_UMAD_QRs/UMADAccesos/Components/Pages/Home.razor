@@ -1,0 +1,143 @@
+@page "/"
+@inject IUmadDbInitializer DbInitializer
+@inject IDbContextFactory<UmadDbContext> DbContextFactory
+@inject ISyncQueueService SyncQueueService
+
+<section class="diag-card">
+    <h2>Estado del núcleo del sistema</h2>
+    <p>
+        Base de datos SQLite local:
+        @if (DbInitializer.EstaInicializada)
+        {
+            <span class="status-ok">Inicializada correctamente</span>
+        }
+        else
+        {
+            <span class="status-warn">Pendiente de inicialización</span>
+        }
+    </p>
+    @if (DbInitializer.FechaInicializacionUtc.HasValue)
+    {
+        <p>Última verificación (UTC): @DbInitializer.FechaInicializacionUtc.Value.ToString("yyyy-MM-dd HH:mm:ss")</p>
+    }
+    <button class="btn-refresh" @onclick="CargarResumenSistemaAsync" disabled="@_cargando">
+        @(_cargando ? "Actualizando..." : "Actualizar diagnóstico")
+    </button>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(_mensajeError))
+{
+    <section class="diag-card">
+        <p class="status-err">@_mensajeError</p>
+    </section>
+}
+
+<section class="diag-card">
+    <h2>Resumen de persistencia local</h2>
+    <div class="diag-grid">
+        <div class="diag-metric">
+            <span class="label">Personas registradas</span>
+            <span class="value">@_totalPersonas</span>
+        </div>
+        <div class="diag-metric">
+            <span class="label">Personas activas</span>
+            <span class="value">@_personasActivas</span>
+        </div>
+        <div class="diag-metric">
+            <span class="label">Tokens vigentes</span>
+            <span class="value">@_tokensVigentes</span>
+        </div>
+        <div class="diag-metric">
+            <span class="label">Registros de acceso</span>
+            <span class="value">@_totalRegistros</span>
+        </div>
+    </div>
+</section>
+
+<section class="diag-card">
+    <h2>Cola de sincronización offline</h2>
+    <div class="diag-grid">
+        <div class="diag-metric">
+            <span class="label">Pendientes</span>
+            <span class="value">@(_resumenCola?.Pendientes ?? 0)</span>
+        </div>
+        <div class="diag-metric">
+            <span class="label">Sincronizados</span>
+            <span class="value">@(_resumenCola?.Sincronizados ?? 0)</span>
+        </div>
+        <div class="diag-metric">
+            <span class="label">Con error</span>
+            <span class="value">@(_resumenCola?.ConError ?? 0)</span>
+        </div>
+    </div>
+</section>
+
+@code {
+    // Indica si el componente está consultando actualmente los indicadores del sistema.
+    private bool _cargando;
+
+    // Mensaje seguro de error en caso de fallo al consultar el estado local.
+    private string? _mensajeError;
+
+    // Total de personas almacenadas en SQLite.
+    private int _totalPersonas;
+
+    // Total de personas habilitadas para operar en el sistema.
+    private int _personasActivas;
+
+    // Total de tokens no revocados y dentro de su ventana de vigencia UTC.
+    private int _tokensVigentes;
+
+    // Total de eventos de acceso registrados localmente.
+    private int _totalRegistros;
+
+    // Resumen agregado de la cola de sincronización offline.
+    private SyncQueueSummary? _resumenCola;
+
+    /// <summary>
+    /// Inicializa la vista diagnóstica asegurando la base de datos local y cargando los indicadores base.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarResumenSistemaAsync();
+    }
+
+    /// <summary>
+    /// Consulta el estado de inicialización, conteos agregados de SQLite y resumen de la cola offline sin exponer secretos.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CargarResumenSistemaAsync()
+    {
+        _cargando = true;
+        _mensajeError = null;
+
+        try
+        {
+            await DbInitializer.InitializeAsync();
+
+            await using UmadDbContext db = await DbContextFactory.CreateDbContextAsync();
+            DateTime ahoraUtc = DateTime.UtcNow;
+
+            _totalPersonas = await db.Personas.CountAsync();
+            _personasActivas = await db.Personas.CountAsync(p => p.Activo);
+            _tokensVigentes = await db.TokensAcceso.CountAsync(t => !t.Revocado && t.FechaExpiracion >= ahoraUtc);
+            _totalRegistros = await db.RegistrosAcceso.CountAsync();
+            _resumenCola = await SyncQueueService.ObtenerResumenColaAsync();
+        }
+        catch (Exception)
+        {
+            _mensajeError = "No fue posible consultar el resumen local del sistema.";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+}
