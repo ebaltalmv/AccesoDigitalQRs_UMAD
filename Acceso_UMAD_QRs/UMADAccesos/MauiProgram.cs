@@ -2,6 +2,9 @@ using Microsoft.Extensions.Logging;
 using UMADAccesos.Data;
 using UMADAccesos.Extensions;
 using ZXing.Net.Maui.Controls;
+#if MAUI_DEVFLOW
+using Microsoft.Maui.DevFlow.Agent;
+#endif
 
 namespace UMADAccesos
 {
@@ -41,6 +44,11 @@ namespace UMADAccesos
 #endif
 
             builder.Services.AddUmadCore();
+            builder.Services.AddUmadOperations();
+            builder.Services.AddUmadDeviceServices();
+#if MAUI_DEVFLOW
+            builder.AddMauiDevFlowAgent();
+#endif
 
             MauiApp app = builder.Build();
 

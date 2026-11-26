@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Maui.Storage;
 using UMADAccesos.Data;
+using UMADAccesos.Services.Operations;
 using UMADAccesos.Services.Security;
 using UMADAccesos.Services.Sync;
 
@@ -44,6 +45,25 @@ namespace UMADAccesos.Extensions
             services.AddSingleton<ITokenKeyProvider, SecureStorageTokenKeyProvider>();
             services.AddScoped<ITokenAccesoService, TokenAccesoService>();
             services.AddScoped<ISyncQueueService, SyncQueueService>();
+
+            return services;
+        }
+
+        /// <summary>
+        /// Registra en el contenedor de dependencias los servicios operativos de acceso, eventos, renovaciones e incidencias de Fase 2.
+        /// </summary>
+        /// <author>Emmanuel Baltazar López</author>
+        /// <date>25/11/2026</date>
+        /// <version>1.0</version>
+        /// <modification>25/11/2026</modification>
+        public static IServiceCollection AddUmadOperations(this IServiceCollection services)
+        {
+            ArgumentNullException.ThrowIfNull(services);
+
+            services.AddScoped<IRegistroAccesoService, RegistroAccesoService>();
+            services.AddScoped<IPaseEventoService, PaseEventoService>();
+            services.AddScoped<IRenovacionService, RenovacionService>();
+            services.AddScoped<IIncidenciaService, IncidenciaService>();
 
             return services;
         }

@@ -51,10 +51,28 @@ namespace UMADAccesos.Models
         // Descripción acotada del último error reportado durante la sincronización.
         public string? UltimoError { get; set; }
 
+        // Ruta relativa de la evidencia fotográfica capturada opcionalmente durante el acceso.
+        public string? RutaEvidenciaFoto { get; set; }
+
+        // Huella criptográfica SHA-256 de la evidencia fotográfica asociada al registro.
+        public string? HashEvidenciaFoto { get; set; }
+
+        // Clave foránea opcional hacia el guardia que validó y registró el movimiento en caseta.
+        public int? GuardiaPersonaId { get; set; }
+
+        // Clave foránea autorreferenciada hacia el registro de entrada que originó una salida.
+        public int? EntradaRelacionadaId { get; set; }
+
         // Referencia de navegación hacia la persona involucrada en el evento.
         public Persona? Persona { get; set; }
 
         // Referencia de navegación opcional hacia el token utilizado.
         public TokenAcceso? TokenAcceso { get; set; }
+
+        // Referencia de navegación opcional hacia el guardia responsable del registro.
+        public Persona? Guardia { get; set; }
+
+        // Referencia de navegación opcional hacia la entrada emparejada con este registro de salida.
+        public RegistroAcceso? EntradaRelacionada { get; set; }
     }
 }
