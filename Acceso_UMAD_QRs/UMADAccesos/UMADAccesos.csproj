@@ -20,9 +20,6 @@
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
 		<Nullable>enable</Nullable>
 
-		<!-- Enable XAML source generation for faster build times and improved performance. -->
-		<MauiXamlInflator>SourceGen</MauiXamlInflator>
-
 		<!-- Display name -->
 		<ApplicationTitle>UMADAccesos</ApplicationTitle>
 
@@ -53,8 +50,14 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
-		<RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers>
 		<CodesignEntitlements>Platforms\MacCatalyst\Entitlements.plist</CodesignEntitlements>
+	</PropertyGroup>
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' and '$(Configuration)' == 'Debug' and '$(RuntimeIdentifier)' == ''">
+		<RuntimeIdentifier Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64'">maccatalyst-arm64</RuntimeIdentifier>
+		<RuntimeIdentifier Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' != 'Arm64'">maccatalyst-x64</RuntimeIdentifier>
+	</PropertyGroup>
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' and '$(Configuration)' == 'Release'">
+		<RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">

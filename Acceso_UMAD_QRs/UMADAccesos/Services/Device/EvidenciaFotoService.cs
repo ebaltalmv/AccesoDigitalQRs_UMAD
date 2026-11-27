@@ -14,6 +14,18 @@ public sealed class EvidenciaFotoService : IEvidenciaFotoService
     // Nombre de la subcarpeta dentro de AppDataDirectory donde se almacenan las evidencias fotográficas.
     private const string CarpetaEvidencias = "evidencias";
 
+    // Tamaño máximo permitido por archivo de evidencia fotográfica (10 MB).
+    private const long TamanoMaximoBytes = 10L * 1024L * 1024L;
+
+    // Extensiones de imagen permitidas por lista blanca para evitar almacenamiento de archivos arbitrarios.
+    private static readonly HashSet<string> ExtensionesPermitidas = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp"
+    };
+
     /// <summary>
     /// Captura una fotografía usando la cámara del dispositivo, la guarda en almacenamiento local y retorna la ruta relativa con su hash SHA-256.
     /// </summary>
@@ -63,33 +75,61 @@ public sealed class EvidenciaFotoService : IEvidenciaFotoService
                 return EvidenciaFotoResult.CanceladoPorUsuario();
             }
 
-            // Preparar directorio de destino.
+            // Preparar directorio de destino validando frontera estricta de ruta.
             string directorioBase = FileSystem.AppDataDirectory;
-            string directorioEvidencias = Path.Combine(directorioBase, CarpetaEvidencias);
+            string directorioEvidencias = Path.GetFullPath(Path.Combine(directorioBase, CarpetaEvidencias));
             Directory.CreateDirectory(directorioEvidencias);
 
-            // Generar nombre de archivo único con marca de tiempo.
-            string extension = Path.GetExtension(foto.FileName);
-            if (string.IsNullOrWhiteSpace(extension))
+            // Validar extensión contra lista blanca de imágenes.
+            string extensionCandidata = Path.GetExtension(foto.FileName)?.Trim() ?? string.Empty;
+            string extension = ExtensionesPermitidas.Contains(extensionCandidata)
+                ? extensionCandidata.ToLowerInvariant()
+                : ".jpg";
+
+            // Sanitizar prefijo para evitar traversal de directorios o caracteres inválidos.
+            string prefijo = SanitizarPrefijo(nombreArchivo);
+            string nombreFinal = $"{prefijo}_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}"[..Math.Min(80, prefijo.Length + 29)] + extension;
+
+            string rutaCompleta = Path.GetFullPath(Path.Combine(directorioEvidencias, nombreFinal));
+            string fronteraDirectorio = directorioEvidencias.EndsWith(Path.DirectorySeparatorChar)
+                ? directorioEvidencias
+                : directorioEvidencias + Path.DirectorySeparatorChar;
+
+            if (!rutaCompleta.StartsWith(fronteraDirectorio, StringComparison.Ordinal))
             {
-                extension = ".jpg";
+                return EvidenciaFotoResult.Error("La ruta generada para la evidencia fotográfica no es válida.");
             }
 
-            string? baseSolicitada = string.IsNullOrWhiteSpace(nombreArchivo)
-                ? null
-                : Path.GetFileNameWithoutExtension(nombreArchivo.Trim());
-
-            string prefijo = string.IsNullOrWhiteSpace(baseSolicitada) ? "evidencia" : baseSolicitada;
-            string nombreFinal = $"{prefijo}_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}{extension}";
-
-            string rutaCompleta = Path.Combine(directorioEvidencias, nombreFinal);
             string rutaRelativa = Path.Combine(CarpetaEvidencias, nombreFinal);
 
-            // Copiar la imagen al almacenamiento local.
-            await using (Stream streamOrigen = await foto.OpenReadAsync())
-            await using (FileStream streamDestino = File.Create(rutaCompleta))
+            // Copiar la imagen imponiendo límite de tamaño y limpiando residuos ante cancelación o fallo.
+            try
             {
-                await streamOrigen.CopyToAsync(streamDestino, ct);
+                await using Stream streamOrigen = await foto.OpenReadAsync();
+                await using FileStream streamDestino = File.Create(rutaCompleta);
+
+                byte[] buffer = new byte[81920];
+                long totalLeido = 0;
+                int leidos;
+                while ((leidos = await streamOrigen.ReadAsync(buffer, ct)) > 0)
+                {
+                    totalLeido += leidos;
+                    if (totalLeido > TamanoMaximoBytes)
+                    {
+                        throw new InvalidOperationException("La evidencia fotográfica excede el tamaño máximo permitido de 10 MB.");
+                    }
+
+                    await streamDestino.WriteAsync(buffer.AsMemory(0, leidos), ct);
+                }
+            }
+            catch
+            {
+                if (File.Exists(rutaCompleta))
+                {
+                    try { File.Delete(rutaCompleta); } catch { /* Ignorar fallo al limpiar archivo parcial. */ }
+                }
+
+                throw;
             }
 
             // Calcular el hash SHA-256 del archivo guardado.
@@ -115,6 +155,29 @@ public sealed class EvidenciaFotoService : IEvidenciaFotoService
         {
             return EvidenciaFotoResult.Error($"Error inesperado al capturar evidencia: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Sanitiza el prefijo de archivo permitiendo únicamente caracteres alfanuméricos, guiones y guiones bajos.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string SanitizarPrefijo(string? nombreArchivo)
+    {
+        if (string.IsNullOrWhiteSpace(nombreArchivo))
+        {
+            return "evidencia";
+        }
+
+        string baseNombre = Path.GetFileNameWithoutExtension(nombreArchivo.Trim());
+        char[] filtrados = baseNombre
+            .Where(c => char.IsLetterOrDigit(c) || c == '_' || c == '-')
+            .Take(32)
+            .ToArray();
+
+        return filtrados.Length == 0 ? "evidencia" : new string(filtrados);
     }
 
     /// <summary>

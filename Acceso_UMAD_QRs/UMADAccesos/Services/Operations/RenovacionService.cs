@@ -86,12 +86,12 @@ public sealed class RenovacionService : IRenovacionService
 
         bool personaExiste = await db.Personas
             .AsNoTracking()
-            .AnyAsync(p => p.Id == personaId, ct)
+            .AnyAsync(p => p.Id == personaId && p.Activo, ct)
             .ConfigureAwait(false);
 
         if (!personaExiste)
         {
-            throw new InvalidOperationException($"No se encontró la persona con identificador {personaId}.");
+            throw new InvalidOperationException($"No se encontró una persona activa con identificador {personaId}.");
         }
 
         int? tokenOriginalId = await db.TokensAcceso
@@ -170,14 +170,24 @@ public sealed class RenovacionService : IRenovacionService
             throw new InvalidOperationException($"La solicitud {solicitudId} no se encuentra pendiente (estado actual: {solicitud.Estado}).");
         }
 
-        bool responsableExiste = await db.Personas
+        if (resueltoPorPersonaId == solicitud.PersonaId)
+        {
+            throw new UnauthorizedAccessException("Un usuario no puede aprobar su propia solicitud de renovación.");
+        }
+
+        Persona? responsable = await db.Personas
             .AsNoTracking()
-            .AnyAsync(p => p.Id == resueltoPorPersonaId, ct)
+            .FirstOrDefaultAsync(p => p.Id == resueltoPorPersonaId, ct)
             .ConfigureAwait(false);
 
-        if (!responsableExiste)
+        if (responsable is null || !responsable.Activo)
         {
-            throw new InvalidOperationException($"No se encontró el responsable con identificador {resueltoPorPersonaId}.");
+            throw new InvalidOperationException($"No se encontró un responsable activo con identificador {resueltoPorPersonaId}.");
+        }
+
+        if (responsable.Rol != RolPersona.Administrador)
+        {
+            throw new UnauthorizedAccessException("Solo un administrador de accesos activo puede aprobar solicitudes de renovación.");
         }
 
         TokenAcceso nuevoToken = await _tokenAccesoService
@@ -257,14 +267,24 @@ public sealed class RenovacionService : IRenovacionService
             throw new InvalidOperationException($"La solicitud {solicitudId} no se encuentra pendiente (estado actual: {solicitud.Estado}).");
         }
 
-        bool responsableExiste = await db.Personas
+        if (resueltoPorPersonaId == solicitud.PersonaId)
+        {
+            throw new UnauthorizedAccessException("Un usuario no puede rechazar su propia solicitud de renovación.");
+        }
+
+        Persona? responsable = await db.Personas
             .AsNoTracking()
-            .AnyAsync(p => p.Id == resueltoPorPersonaId, ct)
+            .FirstOrDefaultAsync(p => p.Id == resueltoPorPersonaId, ct)
             .ConfigureAwait(false);
 
-        if (!responsableExiste)
+        if (responsable is null || !responsable.Activo)
         {
-            throw new InvalidOperationException($"No se encontró el responsable con identificador {resueltoPorPersonaId}.");
+            throw new InvalidOperationException($"No se encontró un responsable activo con identificador {resueltoPorPersonaId}.");
+        }
+
+        if (responsable.Rol != RolPersona.Administrador)
+        {
+            throw new UnauthorizedAccessException("Solo un administrador de accesos activo puede rechazar solicitudes de renovación.");
         }
 
         solicitud.Estado = EstadoRenovacion.Rechazada;
@@ -308,7 +328,13 @@ public sealed class RenovacionService : IRenovacionService
             .ConfigureAwait(false);
     }
 
-    // Acota una cadena a una longitud máxima fija.
+    /// <summary>
+    /// Acota una cadena de texto a una longitud máxima fija.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private static string Truncar(string valor, int longitudMaxima)
     {
         return valor.Length <= longitudMaxima ? valor : valor[..longitudMaxima];

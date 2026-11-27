@@ -26,6 +26,21 @@ public interface ITokenAccesoService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Emite y persiste un token firmado acotado estrictamente a una ventana UTC de inicio y fin (ideal para pases por evento).
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    Task<TokenAcceso> EmitirTokenVentanaAsync(
+        int personaId,
+        TipoPase tipoPase,
+        DateTime inicioVigenciaUtc,
+        DateTime finVigenciaUtc,
+        bool revocarPreviosActivos = true,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Valida la integridad criptográfica, estado de revocación, titularidad y vigencia UTC de un código firmado.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>

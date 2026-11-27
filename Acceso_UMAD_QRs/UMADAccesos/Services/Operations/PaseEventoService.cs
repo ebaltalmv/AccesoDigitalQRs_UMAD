@@ -116,22 +116,27 @@ public sealed class PaseEventoService : IPaseEventoService
             throw new InvalidOperationException($"La persona asistente con identificador {personaId} no se encuentra activa.");
         }
 
-        bool creadorExiste = await db.Personas
+        Persona? creador = await db.Personas
             .AsNoTracking()
-            .AnyAsync(p => p.Id == creadoPorPersonaId, ct)
+            .FirstOrDefaultAsync(p => p.Id == creadoPorPersonaId, ct)
             .ConfigureAwait(false);
 
-        if (!creadorExiste)
+        if (creador is null || !creador.Activo)
         {
-            throw new InvalidOperationException($"No se encontró la persona creadora con identificador {creadoPorPersonaId}.");
+            throw new InvalidOperationException($"No se encontró una persona creadora activa con identificador {creadoPorPersonaId}.");
         }
 
-        TimeSpan vigenciaToken = finNormalizadoUtc - ahoraUtc;
+        if (creador.Rol != RolPersona.Administrador)
+        {
+            throw new UnauthorizedAccessException("Solo un administrador de accesos activo puede crear pases por evento.");
+        }
+
         TokenAcceso tokenEvento = await _tokenAccesoService
-            .EmitirTokenAsync(
+            .EmitirTokenVentanaAsync(
                 personaId,
                 TipoPase.Evento,
-                vigenciaToken,
+                inicioNormalizadoUtc,
+                finNormalizadoUtc,
                 revocarPreviosActivos: false,
                 cancellationToken: ct)
             .ConfigureAwait(false);
@@ -167,7 +172,13 @@ public sealed class PaseEventoService : IPaseEventoService
         return paseEvento;
     }
 
-    // Normaliza una fecha a UTC interpretando valores sin especificar como UTC.
+    /// <summary>
+    /// Normaliza una fecha a formato UTC interpretando valores sin especificar como UTC.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private static DateTime NormalizarUtc(DateTime fecha)
     {
         return fecha.Kind switch
@@ -178,7 +189,13 @@ public sealed class PaseEventoService : IPaseEventoService
         };
     }
 
-    // Acota una cadena a una longitud máxima definida.
+    /// <summary>
+    /// Acota una cadena de texto a una longitud máxima definida.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private static string Truncar(string valor, int longitudMaxima)
     {
         return valor.Length <= longitudMaxima ? valor : valor[..longitudMaxima];

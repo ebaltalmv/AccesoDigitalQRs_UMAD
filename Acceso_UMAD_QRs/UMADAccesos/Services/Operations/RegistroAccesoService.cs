@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using UMADAccesos.Data;
 using UMADAccesos.Models;
+using UMADAccesos.Services.AI;
 using UMADAccesos.Services.Security;
 using UMADAccesos.Services.Sync;
 
@@ -37,6 +38,9 @@ public sealed class RegistroAccesoService : IRegistroAccesoService
     // Cola de sincronización offline-first para encolar cada movimiento de acceso.
     private readonly ISyncQueueService _syncQueueService;
 
+    // Servicio opcional de inteligencia artificial para detección no bloqueante de anomalías.
+    private readonly IIaService? _iaService;
+
     // Registrador de eventos operativos de caseta.
     private readonly ILogger<RegistroAccesoService> _logger;
 
@@ -51,12 +55,14 @@ public sealed class RegistroAccesoService : IRegistroAccesoService
         IDbContextFactory<UmadDbContext> dbContextFactory,
         ITokenAccesoService tokenAccesoService,
         ISyncQueueService syncQueueService,
-        ILogger<RegistroAccesoService> logger)
+        ILogger<RegistroAccesoService> logger,
+        IIaService? iaService = null)
     {
         _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
         _tokenAccesoService = tokenAccesoService ?? throw new ArgumentNullException(nameof(tokenAccesoService));
         _syncQueueService = syncQueueService ?? throw new ArgumentNullException(nameof(syncQueueService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _iaService = iaService;
     }
 
     /// <summary>
@@ -108,14 +114,19 @@ public sealed class RegistroAccesoService : IRegistroAccesoService
             throw new InvalidOperationException($"No se encontró la persona con identificador {personaId}.");
         }
 
-        bool guardiaExiste = await db.Personas
+        Persona? guardia = await db.Personas
             .AsNoTracking()
-            .AnyAsync(p => p.Id == guardiaPersonaId, ct)
+            .FirstOrDefaultAsync(p => p.Id == guardiaPersonaId, ct)
             .ConfigureAwait(false);
 
-        if (!guardiaExiste)
+        if (guardia is null || !guardia.Activo)
         {
-            throw new InvalidOperationException($"No se encontró el guardia con identificador {guardiaPersonaId}.");
+            throw new InvalidOperationException($"No se encontró un guardia activo con identificador {guardiaPersonaId}.");
+        }
+
+        if (guardia.Rol != RolPersona.Guardia && guardia.Rol != RolPersona.Administrador)
+        {
+            throw new UnauthorizedAccessException("Solo personal de guardia o administradores activos pueden registrar accesos en caseta.");
         }
 
         TokenAcceso? token = await db.TokensAcceso
@@ -172,6 +183,85 @@ public sealed class RegistroAccesoService : IRegistroAccesoService
     }
 
     /// <summary>
+    /// Registra la entrada en SQLite y ejecuta el detector de anomalías sin bloquear nunca el acceso ante un fallo del motor IA.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public async Task<RegistroEntradaConAnalisisResult> RegistrarEntradaConEvaluacionIaAsync(
+        int personaId,
+        int tokenAccesoId,
+        string puntoAcceso,
+        int guardiaPersonaId,
+        string? rutaEvidenciaFoto = null,
+        string? hashEvidenciaFoto = null,
+        CancellationToken ct = default)
+    {
+        RegistroAcceso registro = await RegistrarEntradaAsync(
+            personaId,
+            tokenAccesoId,
+            puntoAcceso,
+            guardiaPersonaId,
+            rutaEvidenciaFoto,
+            hashEvidenciaFoto,
+            ct).ConfigureAwait(false);
+
+        EvaluacionAnomaliaResult evaluacion;
+        if (_iaService is null)
+        {
+            evaluacion = EvaluacionAnomaliaResult.SinEvaluacionPorFallo(
+                "El servicio de IA no está registrado en el contenedor de dependencias; el acceso continuó sin bloqueo.");
+        }
+        else
+        {
+            try
+            {
+                ContextoEvaluacionAcceso contexto = new()
+                {
+                    PersonaId = personaId,
+                    PuntoAcceso = registro.PuntoAcceso,
+                    TipoMovimiento = TipoMovimientoAcceso.Entrada,
+                    FechaHoraEventoUtc = registro.FechaHora,
+                    TokenAccesoId = registro.TokenAccesoId,
+                    TokenValido = registro.Resultado == ResultadoAcceso.Autorizado,
+                    MotivoValidacionToken = registro.MotivoResultado,
+                    RegistroAccesoActualId = registro.Id
+                };
+
+                evaluacion = await _iaService
+                    .EvaluarAnomaliaAccesoAsync(contexto, ct)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "La evaluación de anomalías falló para RegistroId {RegistroId}; se conserva el acceso sin bloqueo.",
+                    registro.Id);
+
+                evaluacion = EvaluacionAnomaliaResult.SinEvaluacionPorFallo(
+                    "No fue posible completar la evaluación de anomalías; el acceso continuó sin bloqueo.");
+            }
+        }
+
+        SeveridadIncidencia severidadSugerida = evaluacion.NivelRiesgo switch
+        {
+            NivelRiesgoAnomalia.Alto => SeveridadIncidencia.Alta,
+            NivelRiesgoAnomalia.Medio => SeveridadIncidencia.Media,
+            _ => SeveridadIncidencia.Baja
+        };
+
+        return new RegistroEntradaConAnalisisResult
+        {
+            Registro = registro,
+            EvaluacionAnomalia = evaluacion,
+            SugerirLevantarIncidencia = evaluacion.EsAnomalo,
+            SeveridadSugerida = severidadSugerida
+        };
+    }
+
+    /// <summary>
     /// Localiza la entrada abierta de una persona y encola el registro de salida vinculado a dicha entrada.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>
@@ -200,14 +290,19 @@ public sealed class RegistroAccesoService : IRegistroAccesoService
             .CreateDbContextAsync(ct)
             .ConfigureAwait(false);
 
-        bool guardiaExiste = await db.Personas
+        Persona? guardia = await db.Personas
             .AsNoTracking()
-            .AnyAsync(p => p.Id == guardiaPersonaId, ct)
+            .FirstOrDefaultAsync(p => p.Id == guardiaPersonaId, ct)
             .ConfigureAwait(false);
 
-        if (!guardiaExiste)
+        if (guardia is null || !guardia.Activo)
         {
-            throw new InvalidOperationException($"No se encontró el guardia con identificador {guardiaPersonaId}.");
+            throw new InvalidOperationException($"No se encontró un guardia activo con identificador {guardiaPersonaId}.");
+        }
+
+        if (guardia.Rol != RolPersona.Guardia && guardia.Rol != RolPersona.Administrador)
+        {
+            throw new UnauthorizedAccessException("Solo personal de guardia o administradores activos pueden registrar accesos en caseta.");
         }
 
         RegistroAcceso? entradaAbierta = await ObtenerEntradaAbiertaAsync(personaId, ct).ConfigureAwait(false);
@@ -284,7 +379,13 @@ public sealed class RegistroAccesoService : IRegistroAccesoService
             .ConfigureAwait(false);
     }
 
-    // Valida, recorta y acota una cadena obligatoria a la longitud máxima permitida.
+    /// <summary>
+    /// Valida, recorta y acota una cadena obligatoria a la longitud máxima permitida.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private static string NormalizarTextoObligatorio(string valor, string parametro, int longitudMaxima, string mensajeVacio)
     {
         if (string.IsNullOrWhiteSpace(valor))
@@ -295,7 +396,13 @@ public sealed class RegistroAccesoService : IRegistroAccesoService
         return Truncar(valor.Trim(), longitudMaxima);
     }
 
-    // Recorta y acota una cadena opcional devolviendo null si está vacía.
+    /// <summary>
+    /// Recorta y acota una cadena opcional devolviendo nulo cuando se encuentra vacía.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private static string? NormalizarTextoOpcional(string? valor, int longitudMaxima)
     {
         if (string.IsNullOrWhiteSpace(valor))
@@ -306,7 +413,13 @@ public sealed class RegistroAccesoService : IRegistroAccesoService
         return Truncar(valor.Trim(), longitudMaxima);
     }
 
-    // Acota una cadena a una longitud máxima fija.
+    /// <summary>
+    /// Acota una cadena de texto a una longitud máxima fija.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private static string Truncar(string valor, int longitudMaxima)
     {
         return valor.Length <= longitudMaxima ? valor : valor[..longitudMaxima];

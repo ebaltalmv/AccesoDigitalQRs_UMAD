@@ -28,6 +28,22 @@ public interface IRegistroAccesoService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Valida el token de acceso presentado, registra la entrada en SQLite y adjunta una evaluación no bloqueante de anomalías IA.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    Task<RegistroEntradaConAnalisisResult> RegistrarEntradaConEvaluacionIaAsync(
+        int personaId,
+        int tokenAccesoId,
+        string puntoAcceso,
+        int guardiaPersonaId,
+        string? rutaEvidenciaFoto = null,
+        string? hashEvidenciaFoto = null,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Registra la salida de una persona vinculándola automáticamente con su entrada abierta más reciente.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>

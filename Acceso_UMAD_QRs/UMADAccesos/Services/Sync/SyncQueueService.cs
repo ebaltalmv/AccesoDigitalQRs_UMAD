@@ -27,8 +27,8 @@ public sealed class SyncQueueService : ISyncQueueService
     // Registrador de eventos operativos de continuidad y sincronización.
     private readonly ILogger<SyncQueueService> _logger;
 
-    // Semáforo para evitar ciclos concurrentes de despacho sobre los mismos registros.
-    private readonly SemaphoreSlim _procesamientoLock = new(1, 1);
+    // Semáforo estático compartido entre scopes para evitar ciclos concurrentes de despacho sobre los mismos registros.
+    private static readonly SemaphoreSlim _procesamientoLock = new(1, 1);
 
     /// <summary>
     /// Inicializa una nueva instancia del servicio de cola de sincronización offline.
@@ -245,12 +245,30 @@ public sealed class SyncQueueService : ISyncQueueService
             .MaxAsync(r => r.FechaUltimoIntento, cancellationToken)
             .ConfigureAwait(false);
 
+        int pasesEventoPendientes = await dbContext.PasesEvento
+            .AsNoTracking()
+            .CountAsync(p => !p.Sincronizado && p.EstadoSincronizacion == EstadoSincronizacion.Pendiente, cancellationToken)
+            .ConfigureAwait(false);
+
+        int renovacionesPendientes = await dbContext.SolicitudesRenovacion
+            .AsNoTracking()
+            .CountAsync(s => !s.Sincronizado && s.EstadoSincronizacion == EstadoSincronizacion.Pendiente, cancellationToken)
+            .ConfigureAwait(false);
+
+        int incidenciasPendientes = await dbContext.Incidencias
+            .AsNoTracking()
+            .CountAsync(i => !i.Sincronizado && i.EstadoSincronizacion == EstadoSincronizacion.Pendiente, cancellationToken)
+            .ConfigureAwait(false);
+
         return new SyncQueueSummary
         {
             Pendientes = pendientes,
             Sincronizados = sincronizados,
             ConError = conError,
-            UltimoIntentoUtc = ultimoIntento
+            UltimoIntentoUtc = ultimoIntento,
+            PasesEventoPendientes = pasesEventoPendientes,
+            RenovacionesPendientes = renovacionesPendientes,
+            IncidenciasPendientes = incidenciasPendientes
         };
     }
 
@@ -367,7 +385,13 @@ public sealed class SyncQueueService : ISyncQueueService
         }
     }
 
-    // Consulta la conectividad de red de manera defensiva para tolerar ejecuciones fuera del contexto MAUI.
+    /// <summary>
+    /// Consulta la conectividad de red de manera defensiva para tolerar ejecuciones fuera del contexto MAUI.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private bool TieneAccesoAInternet()
     {
         try

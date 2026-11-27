@@ -79,11 +79,18 @@ public sealed class QrScannerService : IQrScannerService
                 {
                     MainThread.BeginInvokeOnMainThread(async () =>
                     {
-                        if (paginaPrincipal is not null &&
-                            scannerPage is not null &&
-                            paginaPrincipal.Navigation.ModalStack.Contains(scannerPage))
+                        try
                         {
-                            await paginaPrincipal.Navigation.PopModalAsync(animated: true);
+                            if (paginaPrincipal is not null &&
+                                scannerPage is not null &&
+                                paginaPrincipal.Navigation.ModalStack.Contains(scannerPage))
+                            {
+                                await paginaPrincipal.Navigation.PopModalAsync(animated: true);
+                            }
+                        }
+                        catch
+                        {
+                            // Evita excepciones no observadas en async void si la modal ya fue cerrada.
                         }
                     });
                 }

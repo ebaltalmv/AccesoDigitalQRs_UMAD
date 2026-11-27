@@ -20,4 +20,17 @@ public sealed class SyncQueueSummary
 
     // Fecha y hora UTC del intento de sincronización más reciente registrado.
     public DateTime? UltimoIntentoUtc { get; init; }
+
+    // Total de pases por evento pendientes de sincronización remota.
+    public int PasesEventoPendientes { get; init; }
+
+    // Total de solicitudes de renovación pendientes de sincronización remota.
+    public int RenovacionesPendientes { get; init; }
+
+    // Total de incidencias operativas pendientes de sincronización remota.
+    public int IncidenciasPendientes { get; init; }
+
+    // Conteo consolidado de todas las entidades operativas pendientes de sincronización offline.
+    public int TotalPendientesOperativos =>
+        Pendientes + PasesEventoPendientes + RenovacionesPendientes + IncidenciasPendientes;
 }

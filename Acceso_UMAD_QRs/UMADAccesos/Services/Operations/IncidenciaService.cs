@@ -98,14 +98,19 @@ public sealed class IncidenciaService : IIncidenciaService
             .CreateDbContextAsync(ct)
             .ConfigureAwait(false);
 
-        bool reportanteExiste = await db.Personas
+        Persona? reportante = await db.Personas
             .AsNoTracking()
-            .AnyAsync(p => p.Id == reportadoPorPersonaId, ct)
+            .FirstOrDefaultAsync(p => p.Id == reportadoPorPersonaId, ct)
             .ConfigureAwait(false);
 
-        if (!reportanteExiste)
+        if (reportante is null || !reportante.Activo)
         {
-            throw new InvalidOperationException($"No se encontró la persona reportante con identificador {reportadoPorPersonaId}.");
+            throw new InvalidOperationException($"No se encontró una persona reportante activa con identificador {reportadoPorPersonaId}.");
+        }
+
+        if (reportante.Rol != RolPersona.Guardia && reportante.Rol != RolPersona.Administrador)
+        {
+            throw new UnauthorizedAccessException("Solo personal de guardia o administradores activos pueden reportar incidencias.");
         }
 
         if (registroAccesoId.HasValue)
@@ -233,7 +238,13 @@ public sealed class IncidenciaService : IIncidenciaService
             .ConfigureAwait(false);
     }
 
-    // Recorta y acota una cadena opcional devolviendo null si está vacía.
+    /// <summary>
+    /// Recorta y acota una cadena opcional devolviendo nulo cuando se encuentra vacía.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private static string? NormalizarTextoOpcional(string? valor, int longitudMaxima)
     {
         if (string.IsNullOrWhiteSpace(valor))
@@ -244,7 +255,13 @@ public sealed class IncidenciaService : IIncidenciaService
         return Truncar(valor.Trim(), longitudMaxima);
     }
 
-    // Acota una cadena a una longitud máxima definida.
+    /// <summary>
+    /// Acota una cadena de texto a una longitud máxima definida.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
     private static string Truncar(string valor, int longitudMaxima)
     {
         return valor.Length <= longitudMaxima ? valor : valor[..longitudMaxima];

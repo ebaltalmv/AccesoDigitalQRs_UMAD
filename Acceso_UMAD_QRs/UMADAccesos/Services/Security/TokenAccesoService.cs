@@ -94,6 +94,92 @@ public sealed class TokenAccesoService : ITokenAccesoService
             throw new ArgumentOutOfRangeException(nameof(vigencia), "La vigencia del token debe ser mayor que cero.");
         }
 
+        long emisionUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        TimeSpan duracion = vigencia ?? ObtenerVigenciaPorDefecto(tipoPase);
+        long segundosVigencia = Math.Max(1L, (long)Math.Ceiling(duracion.TotalSeconds));
+        long expiracionUnix = emisionUnix + segundosVigencia;
+
+        return await EmitirTokenInternoAsync(
+                personaId,
+                tipoPase,
+                emisionUnix,
+                expiracionUnix,
+                revocarPreviosActivos,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Emite y firma con HMAC-SHA256 un token acotado estrictamente a la ventana UTC [inicioVigenciaUtc, finVigenciaUtc].
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public async Task<TokenAcceso> EmitirTokenVentanaAsync(
+        int personaId,
+        TipoPase tipoPase,
+        DateTime inicioVigenciaUtc,
+        DateTime finVigenciaUtc,
+        bool revocarPreviosActivos = true,
+        CancellationToken cancellationToken = default)
+    {
+        if (personaId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(personaId), "El identificador de persona debe ser mayor que cero.");
+        }
+
+        if (!Enum.IsDefined(tipoPase))
+        {
+            throw new ArgumentOutOfRangeException(nameof(tipoPase), "El tipo de pase especificado no es válido.");
+        }
+
+        DateTime inicioNormalizadoUtc = NormalizarUtc(inicioVigenciaUtc);
+        DateTime finNormalizadoUtc = NormalizarUtc(finVigenciaUtc);
+
+        if (finNormalizadoUtc <= inicioNormalizadoUtc)
+        {
+            throw new ArgumentException("La fecha de fin de vigencia debe ser posterior a la fecha de inicio.", nameof(finVigenciaUtc));
+        }
+
+        if (finNormalizadoUtc <= DateTime.UtcNow)
+        {
+            throw new ArgumentException("La fecha de fin de vigencia debe ser posterior a la fecha y hora actual.", nameof(finVigenciaUtc));
+        }
+
+        long emisionUnix = new DateTimeOffset(inicioNormalizadoUtc, TimeSpan.Zero).ToUnixTimeSeconds();
+        long expiracionUnix = new DateTimeOffset(finNormalizadoUtc, TimeSpan.Zero).ToUnixTimeSeconds();
+
+        if (expiracionUnix <= emisionUnix)
+        {
+            expiracionUnix = emisionUnix + 1L;
+        }
+
+        return await EmitirTokenInternoAsync(
+                personaId,
+                tipoPase,
+                emisionUnix,
+                expiracionUnix,
+                revocarPreviosActivos,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Persiste y firma criptográficamente el token para una persona activa usando las marcas Unix exactas de inicio y expiración.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task<TokenAcceso> EmitirTokenInternoAsync(
+        int personaId,
+        TipoPase tipoPase,
+        long emisionUnix,
+        long expiracionUnix,
+        bool revocarPreviosActivos,
+        CancellationToken cancellationToken)
+    {
         await using UmadDbContext dbContext = await _dbContextFactory
             .CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -112,25 +198,21 @@ public sealed class TokenAccesoService : ITokenAccesoService
             throw new InvalidOperationException($"No se puede emitir un token porque la persona {personaId} está inactiva.");
         }
 
-        long emisionUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        TimeSpan duracion = vigencia ?? ObtenerVigenciaPorDefecto(tipoPase);
-        long segundosVigencia = Math.Max(1L, (long)Math.Ceiling(duracion.TotalSeconds));
-        long expiracionUnix = emisionUnix + segundosVigencia;
-
+        DateTime ahoraUtc = DateTime.UtcNow;
         DateTime fechaEmisionUtc = DateTimeOffset.FromUnixTimeSeconds(emisionUnix).UtcDateTime;
         DateTime fechaExpiracionUtc = DateTimeOffset.FromUnixTimeSeconds(expiracionUnix).UtcDateTime;
 
         if (revocarPreviosActivos)
         {
             List<TokenAcceso> tokensActivosPrevios = await dbContext.TokensAcceso
-                .Where(t => t.PersonaId == personaId && !t.Revocado && t.FechaExpiracion >= fechaEmisionUtc)
+                .Where(t => t.PersonaId == personaId && !t.Revocado && t.FechaExpiracion >= ahoraUtc)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
             foreach (TokenAcceso tokenPrevio in tokensActivosPrevios)
             {
                 tokenPrevio.Revocado = true;
-                tokenPrevio.FechaRevocacionUtc = fechaEmisionUtc;
+                tokenPrevio.FechaRevocacionUtc = ahoraUtc;
                 tokenPrevio.MotivoRevocacion = MotivoReemplazoEmision;
             }
         }
@@ -169,10 +251,11 @@ public sealed class TokenAccesoService : ITokenAccesoService
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation(
-            "Token de acceso {TokenId} emitido para PersonaId {PersonaId} con TipoPase {TipoPase} vigente hasta {FechaExpiracionUtc:O}.",
+            "Token de acceso {TokenId} emitido para PersonaId {PersonaId} con TipoPase {TipoPase} vigente de {FechaEmisionUtc:O} a {FechaExpiracionUtc:O}.",
             nuevoToken.Id,
             nuevoToken.PersonaId,
             nuevoToken.TipoPase,
+            nuevoToken.FechaEmision,
             nuevoToken.FechaExpiracion);
 
         return nuevoToken;

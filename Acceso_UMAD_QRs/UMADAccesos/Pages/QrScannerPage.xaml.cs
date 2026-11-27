@@ -15,8 +15,8 @@ public partial class QrScannerPage : ContentPage
     // TaskCompletionSource que permite devolver el resultado del escaneo de forma asíncrona.
     private readonly TaskCompletionSource<QrScanResult> _tcs;
 
-    // Bandera para garantizar que el resultado se resuelva una sola vez.
-    private bool _finalizado;
+    // Bandera atómica (0 = activo, 1 = finalizado) para garantizar que el resultado se resuelva una sola vez entre hilos.
+    private int _finalizado;
 
     /// <summary>
     /// Inicializa la página de escaneo QR, configura el formato QR exclusivo y registra el TaskCompletionSource.
@@ -49,7 +49,7 @@ public partial class QrScannerPage : ContentPage
     {
         base.OnAppearing();
 
-        if (_finalizado)
+        if (Volatile.Read(ref _finalizado) != 0)
             return;
 
         try
@@ -67,7 +67,7 @@ public partial class QrScannerPage : ContentPage
                 return;
             }
 
-            if (!_finalizado)
+            if (Volatile.Read(ref _finalizado) == 0)
             {
                 BarcodeReader.IsDetecting = true;
             }
@@ -91,9 +91,8 @@ public partial class QrScannerPage : ContentPage
         base.OnDisappearing();
         BarcodeReader.IsDetecting = false;
 
-        if (!_finalizado)
+        if (Interlocked.Exchange(ref _finalizado, 1) == 0)
         {
-            _finalizado = true;
             _tcs.TrySetResult(QrScanResult.CanceladoPorUsuario());
         }
     }
@@ -107,7 +106,7 @@ public partial class QrScannerPage : ContentPage
     /// <modification>25/11/2026</modification>
     private void OnBarcodesDetected(object? sender, BarcodeDetectionEventArgs e)
     {
-        if (_finalizado)
+        if (Volatile.Read(ref _finalizado) != 0)
             return;
 
         BarcodeResult[]? resultados = e.Results;
@@ -118,11 +117,12 @@ public partial class QrScannerPage : ContentPage
         if (string.IsNullOrWhiteSpace(codigo))
             return;
 
-        _finalizado = true;
-        BarcodeReader.IsDetecting = false;
+        if (Interlocked.Exchange(ref _finalizado, 1) != 0)
+            return;
 
         MainThread.BeginInvokeOnMainThread(async () =>
         {
+            BarcodeReader.IsDetecting = false;
             await CerrarModalDeFormaSeguraAsync();
             _tcs.TrySetResult(QrScanResult.Exito(codigo));
         });
@@ -149,7 +149,7 @@ public partial class QrScannerPage : ContentPage
     /// <modification>25/11/2026</modification>
     protected override bool OnBackButtonPressed()
     {
-        if (_finalizado)
+        if (Volatile.Read(ref _finalizado) != 0)
             return base.OnBackButtonPressed();
 
         MainThread.BeginInvokeOnMainThread(async () =>
@@ -169,10 +169,9 @@ public partial class QrScannerPage : ContentPage
     /// <modification>25/11/2026</modification>
     private async Task CerrarConResultadoAsync(QrScanResult resultado)
     {
-        if (_finalizado)
+        if (Interlocked.Exchange(ref _finalizado, 1) != 0)
             return;
 
-        _finalizado = true;
         BarcodeReader.IsDetecting = false;
 
         await CerrarModalDeFormaSeguraAsync();

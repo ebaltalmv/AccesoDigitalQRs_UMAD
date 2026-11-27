@@ -44,6 +44,7 @@ namespace UMADAccesos
 #endif
 
             builder.Services.AddUmadCore();
+            builder.Services.AddUmadAiAndAuth();
             builder.Services.AddUmadOperations();
             builder.Services.AddUmadDeviceServices();
 #if MAUI_DEVFLOW
