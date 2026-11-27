@@ -44,7 +44,11 @@ namespace UMADAccesos
 #endif
 
             builder.Services.AddUmadCore();
+#if DEBUG
+            builder.Services.AddUmadAiAndAuth(configurarEntorno: opt => opt.HabilitarModoPruebaEnDebug = true);
+#else
             builder.Services.AddUmadAiAndAuth();
+#endif
             builder.Services.AddUmadOperations();
             builder.Services.AddUmadDeviceServices();
 #if MAUI_DEVFLOW

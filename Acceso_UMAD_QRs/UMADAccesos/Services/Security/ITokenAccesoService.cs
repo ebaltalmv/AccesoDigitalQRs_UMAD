@@ -64,6 +64,19 @@ public interface ITokenAccesoService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Revoca un token existente validando previamente que el operador sea un administrador activo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    Task<bool> RevocarTokenAsync(
+        int tokenId,
+        int administradorPersonaId,
+        string motivoRevocacion,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Obtiene los tokens vigentes y no revocados asociados a una persona específica.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>

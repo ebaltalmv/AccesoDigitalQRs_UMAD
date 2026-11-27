@@ -1,0 +1,917 @@
+/* ==========================================================================
+   UMAD Accesos v2.0 - Design System SAP Fiori Horizon / Quartz + Identidad UMAD
+   ========================================================================== */
+
+:root {
+    /* Paleta institucional UMAD */
+    --umadNavy: #003366;
+    --umadNavyDark: #002244;
+    --umadGold: #C99700;
+    --umadGoldSoft: #FFF7DF;
+
+    /* Tokens estructurales SAP Fiori Horizon / Quartz */
+    --sapBrandColor: #003366;
+    --sapShellColor: #002244;
+    --sapBackgroundColor: #F5F6F7;
+    --sapTileBackground: #FFFFFF;
+    --sapTextColor: #1D2D3E;
+    --sapSecondaryTextColor: #556B82;
+    --sapBorderColor: #D9E0E6;
+
+    /* Estados semánticos exactos Fiori */
+    --sapPositiveColor: #188918;
+    --sapPositiveBackground: #F1FDF6;
+    --sapCriticalColor: #B95000;
+    --sapCriticalBackground: #FFF8EB;
+    --sapNegativeColor: #BB0000;
+    --sapNegativeBackground: #FFF0F0;
+    --sapInformativeColor: #0064D9;
+    --sapInformativeBackground: #EBF5FF;
+
+    /* Tipografía, radios y elevaciones */
+    --sapFontFamily: "72", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --sapFontMonoFamily: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    --sapElementRadius: 0.5rem;
+    --sapCardRadius: 0.75rem;
+    --sapShadowLevel1: 0 0 2px rgba(29, 45, 62, 0.12), 0 2px 6px rgba(29, 45, 62, 0.08);
+    --sapShadowLevel2: 0 0 4px rgba(29, 45, 62, 0.16), 0 8px 24px rgba(29, 45, 62, 0.14);
+
+    /* Dimensiones de layout y espaciado */
+    --sapShellHeight: 56px;
+    --sapSidebarWidth: 260px;
+    --sapSpaceXs: 0.25rem;
+    --sapSpaceSm: 0.5rem;
+    --sapSpaceMd: 1rem;
+    --sapSpaceLg: 1.5rem;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--sapFontFamily);
+    background-color: var(--sapBackgroundColor);
+    color: var(--sapTextColor);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+}
+
+a {
+    color: var(--sapInformativeColor);
+}
+
+:focus-visible {
+    outline: 2px solid var(--umadGold);
+    outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Shell principal y navegación Fiori
+   ========================================================================== */
+
+.fiori-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--sapBackgroundColor);
+    color: var(--sapTextColor);
+}
+
+.fiori-shellbar {
+    position: sticky;
+    top: 0;
+    z-index: 300;
+    min-height: var(--sapShellHeight);
+    background: linear-gradient(90deg, var(--sapShellColor) 0%, var(--umadNavy) 100%);
+    color: #FFFFFF;
+    border-bottom: 3px solid var(--umadGold);
+    padding: 0.5rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    box-shadow: var(--sapShadowLevel1);
+}
+
+.fiori-shellbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.fiori-shellbar-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fiori-shellbar-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    background-color: rgba(201, 151, 0, 0.22);
+    border: 1px solid rgba(201, 151, 0, 0.75);
+    color: #FFE799;
+    white-space: nowrap;
+}
+
+.fiori-shellbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.fiori-user-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    font-size: 0.8rem;
+    color: #FFFFFF;
+    max-width: 280px;
+}
+
+.fiori-user-pill strong {
+    font-weight: 700;
+    color: #FFE799;
+}
+
+.fiori-menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--sapElementRadius);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #FFFFFF;
+    font-size: 1.15rem;
+    cursor: pointer;
+}
+
+.fiori-menu-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.22);
+}
+
+/* Barra de conectividad y cola offline */
+.fiori-offline-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    padding: 0.5rem 1.25rem;
+    background-color: var(--sapTileBackground);
+    border-bottom: 1px solid var(--sapBorderColor);
+    font-size: 0.84rem;
+}
+
+.fiori-offline-bar-info {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+/* Banner exclusivo de modo de prueba DEBUG */
+.fiori-debug-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.55rem 1.25rem;
+    background-color: var(--umadGoldSoft);
+    color: #6B4E00;
+    border-bottom: 2px solid var(--umadGold);
+    font-size: 0.85rem;
+}
+
+.fiori-debug-banner-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-weight: 700;
+}
+
+.fiori-debug-banner-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.fiori-shell-body {
+    flex: 1;
+    display: flex;
+    position: relative;
+    min-height: 0;
+}
+
+.fiori-sidebar {
+    width: var(--sapSidebarWidth);
+    flex-shrink: 0;
+    background-color: var(--sapTileBackground);
+    border-right: 1px solid var(--sapBorderColor);
+    padding: 1rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.fiori-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.fiori-sidebar-section {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--sapSecondaryTextColor);
+    padding: 0.35rem 0.75rem 0.25rem;
+}
+
+.fiori-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.62rem 0.85rem;
+    border-radius: var(--sapElementRadius);
+    border-left: 3px solid transparent;
+    color: var(--sapTextColor);
+    text-decoration: none;
+    font-size: 0.92rem;
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    background: transparent;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+}
+
+.fiori-nav-link:hover {
+    background-color: #EEF3F8;
+    color: var(--sapBrandColor);
+}
+
+.fiori-nav-link.active {
+    background-color: var(--sapInformativeBackground);
+    color: var(--sapBrandColor);
+    font-weight: 700;
+    border-left-color: var(--umadGold);
+}
+
+.fiori-sidebar-footer {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--sapBorderColor);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.fiori-sidebar-backdrop {
+    display: none;
+}
+
+.fiori-main {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: var(--sapSpaceLg);
+}
+
+/* ==========================================================================
+   Encabezados de página, tarjetas, grids y KPIs
+   ========================================================================== */
+
+.fiori-page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.fiori-page-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--umadNavyDark);
+    line-height: 1.2;
+}
+
+.fiori-page-subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.92rem;
+    color: var(--sapSecondaryTextColor);
+}
+
+.fiori-card {
+    background-color: var(--sapTileBackground);
+    border: 1px solid var(--sapBorderColor);
+    border-radius: var(--sapCardRadius);
+    box-shadow: var(--sapShadowLevel1);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.fiori-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--sapBorderColor);
+}
+
+.fiori-card-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--umadNavy);
+}
+
+.fiori-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.fiori-grid--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fiori-grid--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fiori-grid--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.fiori-kpi {
+    background-color: var(--sapTileBackground);
+    border: 1px solid var(--sapBorderColor);
+    border-top: 3px solid var(--umadNavy);
+    border-radius: var(--sapElementRadius);
+    padding: 0.95rem 1rem;
+    box-shadow: var(--sapShadowLevel1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.fiori-kpi-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--sapSecondaryTextColor);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.fiori-kpi-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--umadNavyDark);
+    line-height: 1.15;
+}
+
+.fiori-kpi-sub {
+    font-size: 0.8rem;
+    color: var(--sapSecondaryTextColor);
+}
+
+/* ==========================================================================
+   Formularios, botones y retroalimentación de validación
+   ========================================================================== */
+
+.fiori-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+
+.fiori-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--sapTextColor);
+}
+
+.fiori-input,
+.fiori-select,
+.fiori-textarea {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.92rem;
+    color: var(--sapTextColor);
+    background-color: #FFFFFF;
+    border: 1px solid #89919A;
+    border-radius: var(--sapElementRadius);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fiori-input:focus,
+.fiori-select:focus,
+.fiori-textarea:focus {
+    outline: none;
+    border-color: var(--sapBrandColor);
+    box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.16);
+}
+
+.fiori-input:disabled,
+.fiori-select:disabled,
+.fiori-textarea:disabled {
+    background-color: #F2F4F6;
+    color: var(--sapSecondaryTextColor);
+    cursor: not-allowed;
+}
+
+.fiori-textarea {
+    min-height: 92px;
+    resize: vertical;
+}
+
+.fiori-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 38px;
+    padding: 0.5rem 1rem;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border-radius: var(--sapElementRadius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.fiori-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.fiori-btn--emphasized {
+    background-color: var(--sapBrandColor);
+    border-color: var(--sapBrandColor);
+    color: #FFFFFF;
+}
+
+.fiori-btn--emphasized:hover:not(:disabled) {
+    background-color: var(--umadNavyDark);
+    border-color: var(--umadNavyDark);
+}
+
+.fiori-btn--standard {
+    background-color: #FFFFFF;
+    border-color: var(--sapBorderColor);
+    color: var(--sapBrandColor);
+}
+
+.fiori-btn--standard:hover:not(:disabled) {
+    background-color: #EEF3F8;
+    border-color: var(--sapBrandColor);
+}
+
+.fiori-btn--positive {
+    background-color: var(--sapPositiveColor);
+    border-color: var(--sapPositiveColor);
+    color: #FFFFFF;
+}
+
+.fiori-btn--positive:hover:not(:disabled) {
+    background-color: #126C12;
+}
+
+.fiori-btn--negative {
+    background-color: var(--sapNegativeColor);
+    border-color: var(--sapNegativeColor);
+    color: #FFFFFF;
+}
+
+.fiori-btn--negative:hover:not(:disabled) {
+    background-color: #960000;
+}
+
+.fiori-btn--transparent {
+    background-color: transparent;
+    border-color: transparent;
+    color: var(--sapBrandColor);
+}
+
+.fiori-btn--transparent:hover:not(:disabled) {
+    background-color: rgba(0, 51, 102, 0.08);
+}
+
+.fiori-btn--compact {
+    min-height: 30px;
+    padding: 0.28rem 0.65rem;
+    font-size: 0.8rem;
+}
+
+.fiori-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.fiori-validation-summary {
+    background-color: var(--sapNegativeBackground);
+    color: var(--sapNegativeColor);
+    border: 1px solid var(--sapNegativeColor);
+    border-left-width: 4px;
+    border-radius: var(--sapElementRadius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+}
+
+.fiori-validation-summary ul {
+    margin: 0;
+    padding-left: 1.2rem;
+}
+
+.validation-message {
+    color: var(--sapNegativeColor);
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 0.2rem;
+}
+
+.invalid {
+    border-color: var(--sapNegativeColor) !important;
+    box-shadow: 0 0 0 2px rgba(187, 0, 0, 0.14);
+}
+
+/* ==========================================================================
+   Badges, MessageStrips y Toast Notifications
+   ========================================================================== */
+
+.sap-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.62rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    line-height: 1.25;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.sap-badge--positive {
+    background-color: var(--sapPositiveBackground);
+    color: var(--sapPositiveColor);
+    border-color: rgba(24, 137, 24, 0.32);
+}
+
+.sap-badge--critical {
+    background-color: var(--sapCriticalBackground);
+    color: var(--sapCriticalColor);
+    border-color: rgba(185, 80, 0, 0.35);
+}
+
+.sap-badge--negative {
+    background-color: var(--sapNegativeBackground);
+    color: var(--sapNegativeColor);
+    border-color: rgba(187, 0, 0, 0.32);
+}
+
+.sap-badge--informative {
+    background-color: var(--sapInformativeBackground);
+    color: var(--sapInformativeColor);
+    border-color: rgba(0, 100, 217, 0.32);
+}
+
+.sap-badge--neutral {
+    background-color: #EEF1F4;
+    color: var(--sapSecondaryTextColor);
+    border-color: var(--sapBorderColor);
+}
+
+.sap-messagestrip {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--sapElementRadius);
+    border: 1px solid var(--sapBorderColor);
+    border-left-width: 4px;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.sap-messagestrip--success {
+    background-color: var(--sapPositiveBackground);
+    border-color: rgba(24, 137, 24, 0.35);
+    border-left-color: var(--sapPositiveColor);
+    color: #0F520F;
+}
+
+.sap-messagestrip--warning {
+    background-color: var(--sapCriticalBackground);
+    border-color: rgba(185, 80, 0, 0.38);
+    border-left-color: var(--sapCriticalColor);
+    color: #6E3000;
+}
+
+.sap-messagestrip--error {
+    background-color: var(--sapNegativeBackground);
+    border-color: rgba(187, 0, 0, 0.35);
+    border-left-color: var(--sapNegativeColor);
+    color: #780000;
+}
+
+.sap-messagestrip--information {
+    background-color: var(--sapInformativeBackground);
+    border-color: rgba(0, 100, 217, 0.35);
+    border-left-color: var(--sapInformativeColor);
+    color: #003F8A;
+}
+
+.fiori-toast {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 950;
+    min-width: 280px;
+    max-width: 440px;
+    padding: 0.85rem 1rem;
+    border-radius: var(--sapElementRadius);
+    border: 1px solid var(--sapBorderColor);
+    border-left-width: 4px;
+    background-color: var(--sapTileBackground);
+    color: var(--sapTextColor);
+    box-shadow: var(--sapShadowLevel2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.fiori-toast--positive {
+    background-color: var(--sapPositiveBackground);
+    border-color: rgba(24, 137, 24, 0.35);
+    border-left-color: var(--sapPositiveColor);
+}
+
+.fiori-toast--critical {
+    background-color: var(--sapCriticalBackground);
+    border-color: rgba(185, 80, 0, 0.38);
+    border-left-color: var(--sapCriticalColor);
+}
+
+.fiori-toast--negative {
+    background-color: var(--sapNegativeBackground);
+    border-color: rgba(187, 0, 0, 0.35);
+    border-left-color: var(--sapNegativeColor);
+}
+
+.fiori-toast--informative {
+    background-color: var(--sapInformativeBackground);
+    border-color: rgba(0, 100, 217, 0.35);
+    border-left-color: var(--sapInformativeColor);
+}
+
+/* ==========================================================================
+   Tablas, listas, pestañas, evidencias, QR y utilidades
+   ========================================================================== */
+
+.fiori-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--sapBorderColor);
+    border-radius: var(--sapElementRadius);
+    background-color: var(--sapTileBackground);
+}
+
+.fiori-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.fiori-table th {
+    background-color: #F2F5F8;
+    color: var(--sapSecondaryTextColor);
+    font-weight: 700;
+    text-align: left;
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid var(--sapBorderColor);
+    white-space: nowrap;
+}
+
+.fiori-table td {
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid #ECEFF3;
+    vertical-align: middle;
+}
+
+.fiori-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.fiori-table tbody tr:hover {
+    background-color: #F8FAFC;
+}
+
+.fiori-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--sapBorderColor);
+    border-radius: var(--sapElementRadius);
+    background-color: var(--sapTileBackground);
+    overflow: hidden;
+}
+
+.fiori-list-item {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--sapBorderColor);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.fiori-list-item:last-child {
+    border-bottom: none;
+}
+
+.fiori-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-bottom: 2px solid var(--sapBorderColor);
+    margin-bottom: 1rem;
+    overflow-x: auto;
+}
+
+.fiori-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    padding: 0.65rem 1rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--sapSecondaryTextColor);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.fiori-tab:hover {
+    color: var(--sapBrandColor);
+}
+
+.fiori-tab--active {
+    color: var(--sapBrandColor);
+    border-bottom-color: var(--sapBrandColor);
+}
+
+.fiori-evidence-preview {
+    max-width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+    border-radius: var(--sapElementRadius);
+    border: 1px solid var(--sapBorderColor);
+    background-color: #F8FAFC;
+}
+
+.fiori-qr-frame {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background-color: #FFFFFF;
+    border: 2px solid var(--umadNavy);
+    border-radius: var(--sapCardRadius);
+    box-shadow: var(--sapShadowLevel1);
+}
+
+.fiori-empty-state {
+    text-align: center;
+    padding: 2rem 1.25rem;
+    color: var(--sapSecondaryTextColor);
+    border: 1px dashed var(--sapBorderColor);
+    border-radius: var(--sapCardRadius);
+    background-color: #FAFBFD;
+}
+
+.fiori-mono {
+    font-family: var(--sapFontMonoFamily);
+    font-size: 0.85em;
+    word-break: break-all;
+}
+
+/* ==========================================================================
+   Responsividad móvil / tablet (colapso de sidebar a drawer móvil)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+    .fiori-grid--4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .fiori-grid--3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 860px) {
+    .fiori-menu-toggle {
+        display: inline-flex;
+    }
+
+    .fiori-sidebar {
+        position: fixed;
+        top: var(--sapShellHeight);
+        left: 0;
+        bottom: 0;
+        z-index: 260;
+        width: 272px;
+        max-width: 85vw;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+        box-shadow: var(--sapShadowLevel2);
+        overflow-y: auto;
+    }
+
+    .fiori-sidebar.is-open {
+        transform: translateX(0);
+    }
+
+    .fiori-sidebar-backdrop.is-open {
+        display: block;
+        position: fixed;
+        inset: var(--sapShellHeight) 0 0 0;
+        z-index: 250;
+        background-color: rgba(0, 34, 68, 0.45);
+    }
+
+    .fiori-main {
+        padding: var(--sapSpaceMd);
+    }
+
+    .fiori-grid--2,
+    .fiori-grid--3,
+    .fiori-grid--4 {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fiori-toast {
+        left: 1rem;
+        right: 1rem;
+        bottom: 1rem;
+        min-width: 0;
+        max-width: none;
+    }
+}

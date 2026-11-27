@@ -214,6 +214,46 @@ public sealed class IncidenciaService : IIncidenciaService
     }
 
     /// <summary>
+    /// Actualiza el estado operativo de una incidencia verificando previamente que el operador sea un administrador activo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public async Task<Incidencia> ActualizarEstadoAsync(
+        int incidenciaId,
+        EstadoIncidencia nuevoEstado,
+        int administradorPersonaId,
+        CancellationToken ct = default)
+    {
+        if (administradorPersonaId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(administradorPersonaId), "El identificador del administrador debe ser mayor que cero.");
+        }
+
+        await using UmadDbContext db = await _dbContextFactory
+            .CreateDbContextAsync(ct)
+            .ConfigureAwait(false);
+
+        Persona? administrador = await db.Personas
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == administradorPersonaId, ct)
+            .ConfigureAwait(false);
+
+        if (administrador is null || !administrador.Activo)
+        {
+            throw new InvalidOperationException($"No se encontró un administrador activo con identificador {administradorPersonaId}.");
+        }
+
+        if (administrador.Rol != RolPersona.Administrador)
+        {
+            throw new UnauthorizedAccessException("Solo un administrador de accesos activo puede actualizar el estado de incidencias.");
+        }
+
+        return await ActualizarEstadoAsync(incidenciaId, nuevoEstado, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Obtiene las incidencias que permanecen abiertas o en investigación, priorizadas por severidad descendente.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>
@@ -234,6 +274,39 @@ public sealed class IncidenciaService : IIncidenciaService
             .OrderByDescending(i => i.Severidad)
             .ThenBy(i => i.FechaReporteUtc)
             .ThenBy(i => i.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Obtiene todas las incidencias registradas con filtro opcional por estado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public async Task<IReadOnlyList<Incidencia>> ObtenerTodasAsync(
+        EstadoIncidencia? filtroEstado = null,
+        CancellationToken ct = default)
+    {
+        await using UmadDbContext db = await _dbContextFactory
+            .CreateDbContextAsync(ct)
+            .ConfigureAwait(false);
+
+        IQueryable<Incidencia> consulta = db.Incidencias
+            .AsNoTracking()
+            .Include(i => i.ReportadoPor)
+            .Include(i => i.RegistroAcceso);
+
+        if (filtroEstado.HasValue)
+        {
+            consulta = consulta.Where(i => i.Estado == filtroEstado.Value);
+        }
+
+        return await consulta
+            .OrderBy(i => i.Estado)
+            .ThenByDescending(i => i.Severidad)
+            .ThenByDescending(i => i.FechaReporteUtc)
             .ToListAsync(ct)
             .ConfigureAwait(false);
     }

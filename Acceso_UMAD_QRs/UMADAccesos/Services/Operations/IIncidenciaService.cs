@@ -41,6 +41,19 @@ public interface IIncidenciaService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Actualiza el estado de una incidencia verificando que el operador responsable sea un administrador activo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    Task<Incidencia> ActualizarEstadoAsync(
+        int incidenciaId,
+        EstadoIncidencia nuevoEstado,
+        int administradorPersonaId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Obtiene las incidencias activas (abiertas o en investigación) priorizadas por severidad y antigüedad.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>
@@ -48,5 +61,16 @@ public interface IIncidenciaService
     /// <version>1.0</version>
     /// <modification>25/11/2026</modification>
     Task<IReadOnlyList<Incidencia>> ObtenerAbiertasAsync(
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Obtiene el listado completo de incidencias con filtro opcional por estado, ordenado por severidad y fecha.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    Task<IReadOnlyList<Incidencia>> ObtenerTodasAsync(
+        EstadoIncidencia? filtroEstado = null,
         CancellationToken ct = default);
 }

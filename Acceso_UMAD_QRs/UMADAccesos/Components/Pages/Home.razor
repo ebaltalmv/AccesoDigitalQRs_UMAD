@@ -1,101 +1,276 @@
 @page "/"
+@implements IDisposable
+@inject ISesionActualService SesionActual
 @inject IUmadDbInitializer DbInitializer
-@inject IDbContextFactory<UmadDbContext> DbContextFactory
+@inject IAccesoConsultaService AccesoConsultaService
+@inject ITokenAccesoService TokenAccesoService
+@inject IRenovacionService RenovacionService
+@inject IIncidenciaService IncidenciaService
 @inject ISyncQueueService SyncQueueService
+@inject NavigationManager Navigation
 
-<section class="diag-card">
-    <h2>Estado del núcleo del sistema</h2>
-    <p>
-        Base de datos SQLite local:
-        @if (DbInitializer.EstaInicializada)
-        {
-            <span class="status-ok">Inicializada correctamente</span>
-        }
-        else
-        {
-            <span class="status-warn">Pendiente de inicialización</span>
-        }
-    </p>
-    @if (DbInitializer.FechaInicializacionUtc.HasValue)
-    {
-        <p>Última verificación (UTC): @DbInitializer.FechaInicializacionUtc.Value.ToString("yyyy-MM-dd HH:mm:ss")</p>
-    }
-    <button class="btn-refresh" @onclick="CargarResumenSistemaAsync" disabled="@_cargando">
-        @(_cargando ? "Actualizando..." : "Actualizar diagnóstico")
-    </button>
-</section>
+<ToastNotification Message="@_toastMensaje" Variant="@_toastVariante" OnDismiss="CerrarToast" />
 
-@if (!string.IsNullOrWhiteSpace(_mensajeError))
+@if (!SesionActual.EstaAutenticado || SesionActual.SesionActual is null)
 {
-    <section class="diag-card">
-        <p class="status-err">@_mensajeError</p>
+    <section class="fiori-card">
+        <div class="fiori-header">
+            <div>
+                <h2 class="fiori-section-title">Bienvenido a UMAD Accesos v2.0</h2>
+                <p class="fiori-muted">
+                    Plataforma institucional de control de acceso digital con tokens QR firmados HMAC-SHA256,
+                    operación offline-first en SQLite y análisis inteligente de visitas y anomalías.
+                </p>
+            </div>
+            <StatusBadge Text="@(DbInitializer.EstaInicializada ? "SQLite Local Activa" : "Inicializando SQLite")"
+                         Variant="@(DbInitializer.EstaInicializada ? "positive" : "critical")" />
+        </div>
+
+        <div class="fiori-grid">
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Estado de base local</span>
+                <span class="fiori-kpi-value">@(DbInitializer.EstaInicializada ? "Operativa" : "Pendiente")</span>
+            </div>
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Última verificación local</span>
+                <span class="fiori-kpi-value">
+                    @(DbInitializer.FechaInicializacionUtc.HasValue
+                        ? FormatearHoraLocal(DbInitializer.FechaInicializacionUtc.Value)
+                        : "Sin registro")
+                </span>
+            </div>
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Registros pendientes de sync</span>
+                <span class="fiori-kpi-value">@(_resumenCola?.TotalPendientesOperativos ?? 0)</span>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_mensajeError))
+        {
+            <div class="fiori-alert fiori-alert-error">@_mensajeError</div>
+        }
+
+        <div class="fiori-actions">
+            <a href="/login" class="fiori-btn fiori-btn-primary">Iniciar sesión</a>
+            <button type="button" class="fiori-btn fiori-btn-secondary" @onclick="CargarDashboardAsync" disabled="@_cargando">
+                @(_cargando ? "Verificando..." : "Verificar SQLite local")
+            </button>
+        </div>
+    </section>
+}
+else
+{
+    SesionUsuario sesion = SesionActual.SesionActual;
+
+    <section class="fiori-card">
+        <div class="fiori-header">
+            <div>
+                <h2 class="fiori-section-title">Panel Principal · @sesion.NombreCompleto</h2>
+                <p class="fiori-muted">
+                    @sesion.Correo
+                    @if (!string.IsNullOrWhiteSpace(sesion.Matricula))
+                    {
+                        <span> · Matrícula: @sesion.Matricula</span>
+                    }
+                    <span> · Vigencia de sesión hasta @FormatearHoraLocal(sesion.ExpiraSesionUtc)</span>
+                </p>
+            </div>
+            <div class="fiori-actions">
+                <StatusBadge Text="@ObtenerEtiquetaRol(sesion.RolOperativo)" Variant="informative" />
+                @if (sesion.EsSesionModoPrueba)
+                {
+                    <StatusBadge Text="Modo Prueba" Variant="critical" />
+                }
+                <button type="button" class="fiori-btn fiori-btn-secondary" @onclick="CerrarSesionAsync">
+                    Cerrar sesión
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_mensajeError))
+        {
+            <div class="fiori-alert fiori-alert-error">@_mensajeError</div>
+        }
+
+        <div class="fiori-grid">
+            @if (sesion.RolOperativo == RolUsuario.UsuarioComunidad)
+            {
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Mis pases QR vigentes</span>
+                    <span class="fiori-kpi-value">@_tokensPropiosActivos</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Mis renovaciones pendientes</span>
+                    <span class="fiori-kpi-value">@_renovacionesPropiasPendientes</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Mis pases por evento</span>
+                    <span class="fiori-kpi-value">@_pasesEventoPropios</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Mis movimientos registrados</span>
+                    <span class="fiori-kpi-value">@_registrosRecientesCount</span>
+                </div>
+            }
+            else if (sesion.RolOperativo == RolUsuario.GuardiaSeguridad)
+            {
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Movimientos recientes (SQLite)</span>
+                    <span class="fiori-kpi-value">@_registrosRecientesCount</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Accesos denegados recientes</span>
+                    <span class="fiori-kpi-value">@_accesosDenegadosRecientes</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Incidencias abiertas</span>
+                    <span class="fiori-kpi-value">@_incidenciasAbiertas</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Pendientes de sync offline</span>
+                    <span class="fiori-kpi-value">@(_resumenCola?.TotalPendientesOperativos ?? 0)</span>
+                </div>
+            }
+            else
+            {
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Renovaciones pendientes</span>
+                    <span class="fiori-kpi-value">@_renovacionesPendientesGlobal</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Tokens activos globales</span>
+                    <span class="fiori-kpi-value">@_tokensGlobalesActivos</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Incidencias abiertas (ITIL)</span>
+                    <span class="fiori-kpi-value">@_incidenciasAbiertas</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Pendientes de sync offline</span>
+                    <span class="fiori-kpi-value">@(_resumenCola?.TotalPendientesOperativos ?? 0)</span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="fiori-card">
+        <div class="fiori-header">
+            <h3 class="fiori-section-title">Accesos rápidos</h3>
+            <button type="button" class="fiori-btn fiori-btn-secondary" @onclick="CargarDashboardAsync" disabled="@_cargando">
+                @(_cargando ? "Actualizando..." : "Actualizar KPIs")
+            </button>
+        </div>
+
+        <div class="fiori-grid">
+            @if (sesion.RolOperativo == RolUsuario.UsuarioComunidad)
+            {
+                <div class="fiori-card">
+                    <h4>Mi Pase QR y Solicitudes</h4>
+                    <p class="fiori-muted">Consulta tu código QR vigente, solicita renovaciones asistidas por IA y revisa tus pases por evento.</p>
+                    <a href="/solicitud-pase" class="fiori-btn fiori-btn-primary">Ir a Solicitud y Mi Pase</a>
+                </div>
+                <div class="fiori-card">
+                    <h4>Mi Historial de Accesos</h4>
+                    <p class="fiori-muted">Revisa tus entradas y salidas registradas junto con su estado de sincronización.</p>
+                    <a href="/accesos" class="fiori-btn fiori-btn-secondary">Ver mi historial</a>
+                </div>
+            }
+            else if (sesion.RolOperativo == RolUsuario.GuardiaSeguridad)
+            {
+                <div class="fiori-card">
+                    <h4>Caseta de Vigilancia</h4>
+                    <p class="fiori-muted">Escanea códigos QR, captura evidencia fotográfica, registra entradas/salidas y reporta incidencias.</p>
+                    <a href="/caseta" class="fiori-btn fiori-btn-primary">Abrir Caseta</a>
+                </div>
+                <div class="fiori-card">
+                    <h4>Historial Global de Accesos</h4>
+                    <p class="fiori-muted">Consulta los movimientos registrados en las casetas y revisa evaluaciones de anomalías.</p>
+                    <a href="/accesos" class="fiori-btn fiori-btn-secondary">Consultar historial</a>
+                </div>
+            }
+            else
+            {
+                <div class="fiori-card">
+                    <h4>Panel de Administración</h4>
+                    <p class="fiori-muted">Aprueba renovaciones, emite pases de evento, revoca tokens, atiende incidencias ITIL y supervisa la cola offline.</p>
+                    <a href="/admin" class="fiori-btn fiori-btn-primary">Abrir Panel Admin</a>
+                </div>
+                <div class="fiori-card">
+                    <h4>Auditoría de Accesos</h4>
+                    <p class="fiori-muted">Consulta el historial global institucional y revisa detalle forense con evidencia y análisis IA.</p>
+                    <a href="/accesos" class="fiori-btn fiori-btn-secondary">Auditar historial</a>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="fiori-card">
+        <h3 class="fiori-section-title">Estado de infraestructura local y sincronización</h3>
+        <div class="fiori-grid">
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Accesos pendientes</span>
+                <span class="fiori-kpi-value">@(_resumenCola?.Pendientes ?? 0)</span>
+            </div>
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Accesos sincronizados</span>
+                <span class="fiori-kpi-value">@(_resumenCola?.Sincronizados ?? 0)</span>
+            </div>
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Accesos con error</span>
+                <span class="fiori-kpi-value">@(_resumenCola?.ConError ?? 0)</span>
+            </div>
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Pases / Renovaciones / Incidencias</span>
+                <span class="fiori-kpi-value">
+                    @((_resumenCola?.PasesEventoPendientes ?? 0) + (_resumenCola?.RenovacionesPendientes ?? 0) + (_resumenCola?.IncidenciasPendientes ?? 0))
+                </span>
+            </div>
+        </div>
     </section>
 }
 
-<section class="diag-card">
-    <h2>Resumen de persistencia local</h2>
-    <div class="diag-grid">
-        <div class="diag-metric">
-            <span class="label">Personas registradas</span>
-            <span class="value">@_totalPersonas</span>
-        </div>
-        <div class="diag-metric">
-            <span class="label">Personas activas</span>
-            <span class="value">@_personasActivas</span>
-        </div>
-        <div class="diag-metric">
-            <span class="label">Tokens vigentes</span>
-            <span class="value">@_tokensVigentes</span>
-        </div>
-        <div class="diag-metric">
-            <span class="label">Registros de acceso</span>
-            <span class="value">@_totalRegistros</span>
-        </div>
-    </div>
-</section>
-
-<section class="diag-card">
-    <h2>Cola de sincronización offline</h2>
-    <div class="diag-grid">
-        <div class="diag-metric">
-            <span class="label">Pendientes</span>
-            <span class="value">@(_resumenCola?.Pendientes ?? 0)</span>
-        </div>
-        <div class="diag-metric">
-            <span class="label">Sincronizados</span>
-            <span class="value">@(_resumenCola?.Sincronizados ?? 0)</span>
-        </div>
-        <div class="diag-metric">
-            <span class="label">Con error</span>
-            <span class="value">@(_resumenCola?.ConError ?? 0)</span>
-        </div>
-    </div>
-</section>
-
 @code {
-    // Indica si el componente está consultando actualmente los indicadores del sistema.
+    // Indica si el dashboard está consultando métricas en SQLite.
     private bool _cargando;
 
-    // Mensaje seguro de error en caso de fallo al consultar el estado local.
+    // Mensaje de error seguro para la interfaz.
     private string? _mensajeError;
 
-    // Total de personas almacenadas en SQLite.
-    private int _totalPersonas;
+    // Mensaje del toast informativo.
+    private string? _toastMensaje;
 
-    // Total de personas habilitadas para operar en el sistema.
-    private int _personasActivas;
+    // Variante visual del toast activo.
+    private string _toastVariante = "informative";
 
-    // Total de tokens no revocados y dentro de su ventana de vigencia UTC.
-    private int _tokensVigentes;
-
-    // Total de eventos de acceso registrados localmente.
-    private int _totalRegistros;
-
-    // Resumen agregado de la cola de sincronización offline.
+    // Resumen agregado de la cola offline-first.
     private SyncQueueSummary? _resumenCola;
 
+    // Conteo de tokens vigentes del usuario de comunidad autenticado.
+    private int _tokensPropiosActivos;
+
+    // Conteo de renovaciones pendientes del usuario autenticado.
+    private int _renovacionesPropiasPendientes;
+
+    // Conteo de pases por evento asignados al usuario autenticado.
+    private int _pasesEventoPropios;
+
+    // Conteo de registros de acceso consultados según el alcance del rol.
+    private int _registrosRecientesCount;
+
+    // Conteo de accesos denegados en los registros recientes.
+    private int _accesosDenegadosRecientes;
+
+    // Conteo global de solicitudes de renovación pendientes.
+    private int _renovacionesPendientesGlobal;
+
+    // Conteo global de tokens activos y no revocados.
+    private int _tokensGlobalesActivos;
+
+    // Conteo de incidencias abiertas o en investigación.
+    private int _incidenciasAbiertas;
+
     /// <summary>
-    /// Inicializa la vista diagnóstica asegurando la base de datos local y cargando los indicadores base.
+    /// Inicializa la vista suscribiéndose a cambios de sesión y cargando los indicadores reales desde SQLite.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>
     /// <date>25/11/2026</date>
@@ -103,17 +278,46 @@
     /// <modification>25/11/2026</modification>
     protected override async Task OnInitializedAsync()
     {
-        await CargarResumenSistemaAsync();
+        SesionActual.OnSesionCambiada += ManejarCambioSesion;
+        await CargarDashboardAsync();
     }
 
     /// <summary>
-    /// Consulta el estado de inicialización, conteos agregados de SQLite y resumen de la cola offline sin exponer secretos.
+    /// Libera la suscripción al evento reactivo de sesión al destruir el componente.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>
     /// <date>25/11/2026</date>
     /// <version>1.0</version>
     /// <modification>25/11/2026</modification>
-    private async Task CargarResumenSistemaAsync()
+    public void Dispose()
+    {
+        SesionActual.OnSesionCambiada -= ManejarCambioSesion;
+    }
+
+    /// <summary>
+    /// Reacciona a cambios de sesión recargando el dashboard en el hilo de renderizado Blazor.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async void ManejarCambioSesion()
+    {
+        await InvokeAsync(async () =>
+        {
+            await CargarDashboardAsync();
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>
+    /// Asegura la inicialización local y consulta los KPIs reales según el estado y rol de la sesión.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CargarDashboardAsync()
     {
         _cargando = true;
         _mensajeError = null;
@@ -121,23 +325,124 @@
         try
         {
             await DbInitializer.InitializeAsync();
-
-            await using UmadDbContext db = await DbContextFactory.CreateDbContextAsync();
-            DateTime ahoraUtc = DateTime.UtcNow;
-
-            _totalPersonas = await db.Personas.CountAsync();
-            _personasActivas = await db.Personas.CountAsync(p => p.Activo);
-            _tokensVigentes = await db.TokensAcceso.CountAsync(t => !t.Revocado && t.FechaExpiracion >= ahoraUtc);
-            _totalRegistros = await db.RegistrosAcceso.CountAsync();
             _resumenCola = await SyncQueueService.ObtenerResumenColaAsync();
+
+            SesionUsuario? sesion = SesionActual.SesionActual;
+            if (sesion is null)
+            {
+                return;
+            }
+
+            if (sesion.RolOperativo == RolUsuario.UsuarioComunidad)
+            {
+                IReadOnlyList<TokenAcceso> tokens = await TokenAccesoService.ObtenerTokensActivosPorPersonaAsync(sesion.PersonaId);
+                IReadOnlyList<SolicitudRenovacion> renovaciones = await AccesoConsultaService.ObtenerRenovacionesPorPersonaAsync(sesion.PersonaId);
+                IReadOnlyList<PaseEvento> eventos = await AccesoConsultaService.ObtenerPasesEventoAsync(sesion.PersonaId);
+                IReadOnlyList<RegistroAcceso> registros = await AccesoConsultaService.ObtenerRegistrosAccesoAsync(
+                    personaIdFiltro: sesion.PersonaId,
+                    limite: 200);
+
+                _tokensPropiosActivos = tokens.Count;
+                _renovacionesPropiasPendientes = renovaciones.Count(r => r.Estado == EstadoRenovacion.Pendiente);
+                _pasesEventoPropios = eventos.Count;
+                _registrosRecientesCount = registros.Count;
+            }
+            else if (sesion.RolOperativo == RolUsuario.GuardiaSeguridad)
+            {
+                IReadOnlyList<RegistroAcceso> registros = await AccesoConsultaService.ObtenerRegistrosAccesoAsync(limite: 200);
+                IReadOnlyList<Incidencia> incidencias = await IncidenciaService.ObtenerAbiertasAsync();
+
+                _registrosRecientesCount = registros.Count;
+                _accesosDenegadosRecientes = registros.Count(r => r.Resultado == ResultadoAcceso.Denegado);
+                _incidenciasAbiertas = incidencias.Count;
+            }
+            else
+            {
+                IReadOnlyList<SolicitudRenovacion> pendientes = await RenovacionService.ObtenerPendientesAsync();
+                IReadOnlyList<TokenAcceso> tokensGlobales = await AccesoConsultaService.ObtenerTokensActivosGlobalAsync();
+                IReadOnlyList<Incidencia> incidencias = await IncidenciaService.ObtenerAbiertasAsync();
+
+                _renovacionesPendientesGlobal = pendientes.Count;
+                _tokensGlobalesActivos = tokensGlobales.Count;
+                _incidenciasAbiertas = incidencias.Count;
+            }
         }
         catch (Exception)
         {
-            _mensajeError = "No fue posible consultar el resumen local del sistema.";
+            _mensajeError = "No fue posible consultar los indicadores del sistema desde SQLite.";
         }
         finally
         {
             _cargando = false;
         }
+    }
+
+    /// <summary>
+    /// Cierra la sesión activa y notifica al usuario en la interfaz.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CerrarSesionAsync()
+    {
+        await SesionActual.CerrarSesionAsync();
+        _toastVariante = "informative";
+        _toastMensaje = "Sesión cerrada correctamente.";
+    }
+
+    /// <summary>
+    /// Descarta la notificación toast mostrada actualmente.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void CerrarToast()
+    {
+        _toastMensaje = null;
+    }
+
+    /// <summary>
+    /// Traduce un rol operativo RBAC a su etiqueta legible en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRol(RolUsuario rol) => rol switch
+    {
+        RolUsuario.UsuarioComunidad => "Comunidad UMAD",
+        RolUsuario.GuardiaSeguridad => "Guardia de Seguridad",
+        RolUsuario.AdministradorAccesos => "Administrador de Accesos",
+        _ => "Sin rol"
+    };
+
+    /// <summary>
+    /// Convierte una marca temporal UTC a la zona horaria institucional local para presentación en pantalla.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string FormatearHoraLocal(DateTime fechaUtc)
+    {
+        DateTime normalizada = fechaUtc.Kind == DateTimeKind.Utc
+            ? fechaUtc
+            : (fechaUtc.Kind == DateTimeKind.Local
+                ? fechaUtc.ToUniversalTime()
+                : DateTime.SpecifyKind(fechaUtc, DateTimeKind.Utc));
+
+        TimeZoneInfo zona;
+        try
+        {
+            zona = TimeZoneInfo.FindSystemTimeZoneById("America/Mexico_City");
+        }
+        catch (Exception)
+        {
+            zona = TimeZoneInfo.Local;
+        }
+
+        return TimeZoneInfo.ConvertTimeFromUtc(normalizada, zona).ToString("dd/MM/yyyy HH:mm");
     }
 }

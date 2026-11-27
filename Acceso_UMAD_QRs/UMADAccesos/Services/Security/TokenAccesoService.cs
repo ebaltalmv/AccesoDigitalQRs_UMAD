@@ -425,6 +425,46 @@ public sealed class TokenAccesoService : ITokenAccesoService
     }
 
     /// <summary>
+    /// Marca un token de acceso como revocado exigiendo que quien ejecuta la acción sea un administrador activo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public async Task<bool> RevocarTokenAsync(
+        int tokenId,
+        int administradorPersonaId,
+        string motivoRevocacion,
+        CancellationToken cancellationToken = default)
+    {
+        if (administradorPersonaId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(administradorPersonaId), "El identificador del administrador debe ser mayor que cero.");
+        }
+
+        await using UmadDbContext dbContext = await _dbContextFactory
+            .CreateDbContextAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        Persona? administrador = await dbContext.Personas
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == administradorPersonaId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (administrador is null || !administrador.Activo)
+        {
+            throw new InvalidOperationException($"No se encontró un administrador activo con identificador {administradorPersonaId}.");
+        }
+
+        if (administrador.Rol != RolPersona.Administrador)
+        {
+            throw new UnauthorizedAccessException("Solo un administrador de accesos activo puede revocar tokens.");
+        }
+
+        return await RevocarTokenAsync(tokenId, motivoRevocacion, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Recupera todos los tokens vigentes y no revocados pertenecientes a la persona indicada.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>

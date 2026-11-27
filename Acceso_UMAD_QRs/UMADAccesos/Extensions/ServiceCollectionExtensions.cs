@@ -50,7 +50,7 @@ namespace UMADAccesos.Extensions
         }
 
         /// <summary>
-        /// Registra en el contenedor de dependencias los servicios operativos de acceso, eventos, renovaciones e incidencias de Fase 2.
+        /// Registra en el contenedor de dependencias los servicios operativos de acceso, eventos, renovaciones, incidencias y consultas de Fase 2/4.
         /// </summary>
         /// <author>Emmanuel Baltazar López</author>
         /// <date>25/11/2026</date>
@@ -64,6 +64,7 @@ namespace UMADAccesos.Extensions
             services.AddScoped<IPaseEventoService, PaseEventoService>();
             services.AddScoped<IRenovacionService, RenovacionService>();
             services.AddScoped<IIncidenciaService, IncidenciaService>();
+            services.AddScoped<IAccesoConsultaService, AccesoConsultaService>();
 
             return services;
         }
