@@ -1,0 +1,27 @@
+<span class="sap-badge @ObtenerClaseVariante()">@Text</span>
+
+@code {
+    // Texto legible mostrado dentro de la insignia de estado SAP Fiori.
+    [Parameter]
+    public string Text { get; set; } = string.Empty;
+
+    // Variante semántica SAP Fiori: positive, critical, negative, informative o neutral.
+    [Parameter]
+    public string Variant { get; set; } = "neutral";
+
+    /// <summary>
+    /// Resuelve la clase CSS semántica de la insignia validando contra las variantes soportadas en fiori-tokens.css.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>27/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>27/11/2026</modification>
+    private string ObtenerClaseVariante() => (Variant ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "positive" => "sap-badge--positive",
+        "critical" => "sap-badge--critical",
+        "negative" => "sap-badge--negative",
+        "informative" => "sap-badge--informative",
+        _ => "sap-badge--neutral"
+    };
+}

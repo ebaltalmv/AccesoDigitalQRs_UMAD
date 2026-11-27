@@ -1,0 +1,59 @@
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="fiori-toast @ObtenerClaseVariante()" role="status" aria-live="polite">
+        <span>@Message</span>
+        @if (OnDismiss.HasDelegate)
+        {
+            <button type="button"
+                    class="fiori-btn fiori-btn--transparent fiori-btn--compact"
+                    aria-label="Cerrar notificación"
+                    @onclick="DescartarAsync">
+                ✕
+            </button>
+        }
+    </div>
+}
+
+@code {
+    // Mensaje de notificación a mostrar; cuando es nulo o vacío el componente no se renderiza.
+    [Parameter]
+    public string? Message { get; set; }
+
+    // Variante semántica SAP Fiori del toast: positive, critical, negative o informative.
+    [Parameter]
+    public string Variant { get; set; } = "informative";
+
+    // Callback invocado al descartar manualmente la notificación desde la interfaz.
+    [Parameter]
+    public EventCallback OnDismiss { get; set; }
+
+    /// <summary>
+    /// Notifica al componente padre que el usuario descartó el mensaje toast activo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>27/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>27/11/2026</modification>
+    private async Task DescartarAsync()
+    {
+        if (OnDismiss.HasDelegate)
+        {
+            await OnDismiss.InvokeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Resuelve la clase CSS semántica del toast validando contra las variantes soportadas en fiori-tokens.css.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>27/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>27/11/2026</modification>
+    private string ObtenerClaseVariante() => (Variant ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "positive" => "fiori-toast--positive",
+        "critical" => "fiori-toast--critical",
+        "negative" => "fiori-toast--negative",
+        _ => "fiori-toast--informative"
+    };
+}
