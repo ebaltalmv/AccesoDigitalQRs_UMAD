@@ -1,12 +1,275 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject ISesionActualService SesionActual
+@inject NavigationManager Navigation
 
-<div class="app-shell">
-    <header class="app-header">
-        <h1>UMAD Accesos v2.0</h1>
-        <span class="app-badge">Fase 1 · Core Híbrido</span>
+@{
+    SesionUsuario? sesion = SesionActual.SesionActual;
+    bool autenticado = sesion is not null;
+}
+
+<div class="fiori-shell">
+    <header class="fiori-shellbar">
+        <div class="fiori-shellbar-brand">
+            <button type="button"
+                    class="fiori-menu-toggle"
+                    aria-label="Abrir o cerrar menú de navegación"
+                    aria-expanded="@_menuMovilAbierto"
+                    @onclick="AlternarMenuMovil">
+                ☰
+            </button>
+            <span class="fiori-shellbar-title">UMAD Accesos v2.0</span>
+            <span class="fiori-shellbar-tag">SAP Fiori</span>
+        </div>
+
+        <nav class="fiori-nav" aria-label="Navegación principal">
+            <NavLink class="fiori-nav-item" href="" Match="NavLinkMatch.All">Inicio</NavLink>
+
+            @if (!autenticado)
+            {
+                <NavLink class="fiori-nav-item" href="login">Iniciar sesión</NavLink>
+            }
+            else if (sesion is not null)
+            {
+                @if (sesion.RolOperativo == RolUsuario.UsuarioComunidad)
+                {
+                    <NavLink class="fiori-nav-item" href="solicitud-pase">Mi Pase QR</NavLink>
+                }
+
+                @if (sesion.RolOperativo == RolUsuario.GuardiaSeguridad || sesion.RolOperativo == RolUsuario.AdministradorAccesos)
+                {
+                    <NavLink class="fiori-nav-item" href="caseta">Caseta</NavLink>
+                }
+
+                @if (sesion.RolOperativo == RolUsuario.AdministradorAccesos)
+                {
+                    <NavLink class="fiori-nav-item" href="admin">Administración</NavLink>
+                }
+
+                <NavLink class="fiori-nav-item" href="accesos">
+                    @(sesion.RolOperativo == RolUsuario.UsuarioComunidad ? "Mis Accesos" : "Accesos")
+                </NavLink>
+            }
+        </nav>
+
+        <div class="fiori-shellbar-actions">
+            @if (autenticado && sesion is not null)
+            {
+                <span class="fiori-user-pill" title="@sesion.Correo">
+                    <strong>@sesion.NombreCompleto</strong>
+                </span>
+                <StatusBadge Text="@ObtenerEtiquetaRol(sesion.RolOperativo)" Variant="informative" />
+                @if (sesion.EsSesionModoPrueba)
+                {
+                    <StatusBadge Text="Modo Prueba" Variant="critical" />
+                }
+                <button type="button"
+                        class="fiori-btn fiori-btn-shell fiori-btn--compact"
+                        @onclick="CerrarSesionAsync">
+                    Cerrar sesión
+                </button>
+            }
+            else
+            {
+                <StatusBadge Text="Sin sesión" Variant="neutral" />
+                <a href="/login" class="fiori-btn fiori-btn-shell fiori-btn--compact">Iniciar sesión</a>
+            }
+        </div>
     </header>
 
-    <main class="app-main">
-        @Body
-    </main>
+    @if (autenticado && sesion is not null && sesion.EsSesionModoPrueba)
+    {
+        <div class="fiori-debug-banner" role="status">
+            <div class="fiori-debug-banner-title">
+                <span>Sesión activa en Modo Prueba (entorno Debug)</span>
+                <StatusBadge Text="@ObtenerEtiquetaRol(sesion.RolOperativo)" Variant="critical" />
+            </div>
+            <span>@sesion.NombreCompleto · @sesion.Correo</span>
+        </div>
+    }
+
+    <div class="fiori-shell-body">
+        <div class="fiori-sidebar-backdrop @(_menuMovilAbierto ? "is-open" : string.Empty)"
+             @onclick="CerrarMenuMovil"></div>
+
+        <aside class="fiori-sidebar @(_menuMovilAbierto ? "is-open" : string.Empty)" aria-label="Menú lateral">
+            <div class="fiori-sidebar-nav">
+                <div class="fiori-sidebar-section">Navegación</div>
+                <NavLink class="fiori-nav-link" href="" Match="NavLinkMatch.All" @onclick="CerrarMenuMovil">
+                    Inicio
+                </NavLink>
+
+                @if (!autenticado)
+                {
+                    <div class="fiori-sidebar-section">Acceso</div>
+                    <NavLink class="fiori-nav-link" href="login" @onclick="CerrarMenuMovil">
+                        Iniciar sesión
+                    </NavLink>
+                }
+                else if (sesion is not null)
+                {
+                    <div class="fiori-sidebar-section">Operación</div>
+
+                    @if (sesion.RolOperativo == RolUsuario.UsuarioComunidad)
+                    {
+                        <NavLink class="fiori-nav-link" href="solicitud-pase" @onclick="CerrarMenuMovil">
+                            Mi Pase QR y Solicitudes
+                        </NavLink>
+                    }
+
+                    @if (sesion.RolOperativo == RolUsuario.GuardiaSeguridad || sesion.RolOperativo == RolUsuario.AdministradorAccesos)
+                    {
+                        <NavLink class="fiori-nav-link" href="caseta" @onclick="CerrarMenuMovil">
+                            Caseta de Vigilancia
+                        </NavLink>
+                    }
+
+                    @if (sesion.RolOperativo == RolUsuario.AdministradorAccesos)
+                    {
+                        <NavLink class="fiori-nav-link" href="admin" @onclick="CerrarMenuMovil">
+                            Panel de Administración
+                        </NavLink>
+                    }
+
+                    <NavLink class="fiori-nav-link" href="accesos" @onclick="CerrarMenuMovil">
+                        @(sesion.RolOperativo == RolUsuario.UsuarioComunidad ? "Mi Historial de Accesos" : "Historial de Accesos")
+                    </NavLink>
+                }
+            </div>
+
+            <div class="fiori-sidebar-footer">
+                @if (autenticado && sesion is not null)
+                {
+                    <div class="fiori-detail-item">
+                        <span class="fiori-detail-label">Sesión activa</span>
+                        <span class="fiori-detail-value">@sesion.NombreCompleto</span>
+                        <span class="fiori-field-hint">@sesion.Correo</span>
+                    </div>
+                    <button type="button"
+                            class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                            @onclick="CerrarSesionAsync">
+                        Cerrar sesión
+                    </button>
+                }
+                else
+                {
+                    <span class="fiori-field-hint">Universidad Madero · Control Digital QR</span>
+                }
+            </div>
+        </aside>
+
+        <main class="fiori-main">
+            @Body
+        </main>
+    </div>
 </div>
+
+@code {
+    // Controla la visibilidad del menú lateral colapsable en pantallas móviles y tabletas.
+    private bool _menuMovilAbierto;
+
+    // Indica si el componente ya fue liberado para evitar renderizados tras Dispose.
+    private bool _liberado;
+
+    /// <summary>
+    /// Suscribe el layout al evento reactivo de cambios de sesión al inicializarse.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    protected override void OnInitialized()
+    {
+        SesionActual.OnSesionCambiada += ManejarCambioSesion;
+    }
+
+    /// <summary>
+    /// Libera la suscripción al servicio de sesión para evitar fugas de memoria.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public void Dispose()
+    {
+        _liberado = true;
+        SesionActual.OnSesionCambiada -= ManejarCambioSesion;
+    }
+
+    /// <summary>
+    /// Reacciona ante transiciones de sesión actualizando la barra superior y navegación en el hilo de UI.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async void ManejarCambioSesion()
+    {
+        if (_liberado)
+        {
+            return;
+        }
+
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Ignorado de forma segura si el circuito ya se cerró.
+        }
+    }
+
+    /// <summary>
+    /// Alterna el estado abierto/cerrado del menú lateral en dispositivos móviles.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void AlternarMenuMovil()
+    {
+        _menuMovilAbierto = !_menuMovilAbierto;
+    }
+
+    /// <summary>
+    /// Cierra el cajón lateral móvil tras seleccionar una opción o tocar el fondo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void CerrarMenuMovil()
+    {
+        _menuMovilAbierto = false;
+    }
+
+    /// <summary>
+    /// Cierra de forma segura la sesión actual y redirige a la pantalla de inicio de sesión.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CerrarSesionAsync()
+    {
+        _menuMovilAbierto = false;
+        await SesionActual.CerrarSesionAsync();
+        Navigation.NavigateTo("/login");
+    }
+
+    /// <summary>
+    /// Traduce un rol operativo RBAC a su etiqueta institucional legible en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRol(RolUsuario rol) => rol switch
+    {
+        RolUsuario.UsuarioComunidad => "Comunidad UMAD",
+        RolUsuario.GuardiaSeguridad => "Guardia",
+        RolUsuario.AdministradorAccesos => "Administrador",
+        _ => "Sin rol"
+    };
+}

@@ -1,0 +1,2668 @@
+@page "/admin"
+@using System.Globalization
+@implements IDisposable
+@inject ISesionActualService SesionActual
+@inject IAutorizacionRolService AutorizacionRol
+@inject IRenovacionService RenovacionService
+@inject IPaseEventoService PaseEventoService
+@inject IIncidenciaService IncidenciaService
+@inject IAccesoConsultaService AccesoConsultaService
+@inject ITokenAccesoService TokenAccesoService
+@inject ISyncQueueService SyncQueueService
+@inject IIaService IaService
+@inject IGestionUsuariosService GestionUsuariosService
+
+<ToastNotification Message="@_toastMensaje" Variant="@_toastVariante" OnDismiss="CerrarToast" />
+
+@if (!EsAdministradorAutorizado())
+{
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <h2 class="fiori-card-title">Acceso denegado · Panel Administrativo</h2>
+            <StatusBadge Text="Permiso requerido: AdministradorAccesos" Variant="negative" />
+        </div>
+
+        <div class="sap-messagestrip sap-messagestrip--error" role="alert">
+            <span>
+                @if (!SesionActual.EstaAutenticado || SesionActual.SesionActual is null)
+                {
+                    @("Debe iniciar sesión con una cuenta de Administrador de Accesos para ingresar al panel operativo ITIL.")
+                }
+                else
+                {
+                    @($"La sesión actual ({SesionActual.SesionActual.NombreCompleto}) no posee privilegios de Administrador de Accesos.")
+                }
+            </span>
+        </div>
+
+        <div class="fiori-actions-row">
+            <a href="/" class="fiori-btn fiori-btn--standard">Volver al inicio</a>
+            <a href="/login" class="fiori-btn fiori-btn--emphasized">Ir a iniciar sesión</a>
+        </div>
+    </section>
+}
+else
+{
+    SesionUsuario adminActual = SesionActual.SesionActual!;
+
+    <header class="fiori-page-header">
+        <div>
+            <h2 class="fiori-page-title">Panel Administrativo ITIL</h2>
+            <p class="fiori-page-subtitle">
+                Operador: <strong>@adminActual.NombreCompleto</strong> (@adminActual.Correo) · Gestión centralizada sobre SQLite local
+            </p>
+        </div>
+        <div class="fiori-actions-row">
+            <StatusBadge Text="Administrador de Accesos" Variant="informative" />
+            <button type="button"
+                    class="fiori-btn fiori-btn--standard"
+                    @onclick="CargarDatosPanelAsync"
+                    disabled="@_cargando">
+                @(_cargando ? "Actualizando..." : "Actualizar datos")
+            </button>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(_mensajeError))
+    {
+        <div class="sap-messagestrip sap-messagestrip--error" role="alert">
+            <span>@_mensajeError</span>
+        </div>
+    }
+
+    <section class="fiori-grid" style="margin-bottom: 1.25rem;">
+        <div class="fiori-kpi">
+            <span class="fiori-kpi-label">Usuarios registrados</span>
+            <span class="fiori-kpi-value">@_usuarios.Count</span>
+            <span class="fiori-kpi-sub">
+                Activos: @_usuarios.Count(u => u.Activo) · Admins: @_usuarios.Count(u => u.Activo && u.Rol == RolPersona.Administrador)
+            </span>
+        </div>
+        <div class="fiori-kpi">
+            <span class="fiori-kpi-label">Renovaciones pendientes</span>
+            <span class="fiori-kpi-value">@_renovacionesPendientes.Count</span>
+            <span class="fiori-kpi-sub">Solicitudes por dictaminar</span>
+        </div>
+        <div class="fiori-kpi">
+            <span class="fiori-kpi-label">Tokens activos globales</span>
+            <span class="fiori-kpi-value">@_tokensActivos.Count</span>
+            <span class="fiori-kpi-sub">Vigentes y no revocados</span>
+        </div>
+        <div class="fiori-kpi">
+            <span class="fiori-kpi-label">Incidencias abiertas</span>
+            <span class="fiori-kpi-value">@_incidenciasAbiertas.Count</span>
+            <span class="fiori-kpi-sub">Priorizadas por severidad ITIL</span>
+        </div>
+        <div class="fiori-kpi">
+            <span class="fiori-kpi-label">Cola offline pendiente</span>
+            <span class="fiori-kpi-value">@(_resumenCola?.TotalPendientesOperativos ?? 0)</span>
+            <span class="fiori-kpi-sub">Accesos: @(_resumenCola?.Pendientes ?? 0) · Errores: @(_resumenCola?.ConError ?? 0)</span>
+        </div>
+    </section>
+
+    <nav class="fiori-tabs" role="tablist" aria-label="Secciones administrativas">
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tabActiva == TabRenovaciones ? "true" : "false")"
+                class="fiori-tab @(_tabActiva == TabRenovaciones ? "fiori-tab--active" : string.Empty)"
+                @onclick="() => SeleccionarTab(TabRenovaciones)">
+            Renovaciones (@_renovacionesPendientes.Count)
+        </button>
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tabActiva == TabPasesEvento ? "true" : "false")"
+                class="fiori-tab @(_tabActiva == TabPasesEvento ? "fiori-tab--active" : string.Empty)"
+                @onclick="() => SeleccionarTab(TabPasesEvento)">
+            Pases por Evento (@_pasesEvento.Count)
+        </button>
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tabActiva == TabTokens ? "true" : "false")"
+                class="fiori-tab @(_tabActiva == TabTokens ? "fiori-tab--active" : string.Empty)"
+                @onclick="() => SeleccionarTab(TabTokens)">
+            Tokens Activos (@_tokensActivos.Count)
+        </button>
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tabActiva == TabIncidencias ? "true" : "false")"
+                class="fiori-tab @(_tabActiva == TabIncidencias ? "fiori-tab--active" : string.Empty)"
+                @onclick="() => SeleccionarTab(TabIncidencias)">
+            Incidencias ITIL (@_incidenciasAbiertas.Count)
+        </button>
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tabActiva == TabSync ? "true" : "false")"
+                class="fiori-tab @(_tabActiva == TabSync ? "fiori-tab--active" : string.Empty)"
+                @onclick="() => SeleccionarTab(TabSync)">
+            Continuidad Offline (@(_resumenCola?.TotalPendientesOperativos ?? 0))
+        </button>
+        <button type="button"
+                role="tab"
+                aria-selected="@(_tabActiva == TabUsuarios ? "true" : "false")"
+                class="fiori-tab @(_tabActiva == TabUsuarios ? "fiori-tab--active" : string.Empty)"
+                @onclick="() => SeleccionarTab(TabUsuarios)">
+            Usuarios (@_usuarios.Count)
+        </button>
+    </nav>
+
+    @if (_tabActiva == TabRenovaciones)
+    {
+        <section class="fiori-card">
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Solicitudes de Renovación Pendientes</h3>
+                <StatusBadge Text="@($"IA activa: {IaService.ModoActivo}")" Variant="informative" />
+            </div>
+
+            @if (_renovacionesPendientes.Count == 0)
+            {
+                <div class="fiori-empty-state">
+                    No existen solicitudes de renovación pendientes en este momento.
+                </div>
+            }
+            else
+            {
+                @foreach (SolicitudRenovacion solicitud in _renovacionesPendientes)
+                {
+                    int solicitudId = solicitud.Id;
+                    _dictamenesIaRenovacion.TryGetValue(solicitudId, out ClasificacionVisitaResult? dictamenIa);
+
+                    <article class="fiori-card">
+                        <div class="fiori-card-header">
+                            <div>
+                                <h4 class="fiori-card-title">
+                                    Solicitud #@solicitud.Id · @(solicitud.Persona?.NombreCompleto ?? $"Persona #{solicitud.PersonaId}")
+                                </h4>
+                                <p class="fiori-page-subtitle">
+                                    @(solicitud.Persona?.Correo ?? "Sin correo")
+                                    @if (!string.IsNullOrWhiteSpace(solicitud.Persona?.Matricula))
+                                    {
+                                        <span> · Matrícula: @solicitud.Persona.Matricula</span>
+                                    }
+                                    <span> · Solicitada: @FormatearHoraLocal(solicitud.FechaSolicitudUtc)</span>
+                                </p>
+                            </div>
+                            <div class="fiori-actions-row">
+                                <StatusBadge Text="@($"Pase deseado: {solicitud.TipoPaseDeseado}")" Variant="informative" />
+                                <StatusBadge Text="@FormatearVigencia(solicitud.VigenciaSolicitada)" Variant="neutral" />
+                                <StatusBadge Text="Pendiente" Variant="critical" />
+                            </div>
+                        </div>
+
+                        <div class="fiori-form-group">
+                            <span class="fiori-label">Motivo / Justificación del solicitante</span>
+                            <p style="margin: 0;">@solicitud.Justificacion</p>
+                        </div>
+
+                        @if (dictamenIa is not null)
+                        {
+                            <div class="sap-messagestrip @(dictamenIa.RequiereAprobacionEspecial ? "sap-messagestrip--warning" : "sap-messagestrip--information")">
+                                <div>
+                                    <strong>Dictamen asistido por IA (@dictamenIa.ProveedorUtilizado):</strong>
+                                    <span>
+                                        Categoría <strong>@dictamenIa.TipoVisitaSugerido</strong> · Área sugerida: <strong>@dictamenIa.AreaDestinoSugerida</strong>
+                                        · Confianza: <strong>@dictamenIa.NivelConfianza.ToString("P0", CultureInfo.InvariantCulture)</strong>
+                                    </span>
+                                    <div style="margin-top: 0.25rem;">@dictamenIa.Justificacion</div>
+                                </div>
+                                <StatusBadge Text="@(dictamenIa.RequiereAprobacionEspecial ? "Revisión reforzada" : "Flujo ordinario")"
+                                             Variant="@(dictamenIa.RequiereAprobacionEspecial ? "critical" : "positive")" />
+                            </div>
+                        }
+
+                        <div class="fiori-form-group">
+                            <label class="fiori-label" for="@($"obs-renovacion-{solicitudId}")">
+                                Observación administrativa (obligatoria para rechazar)
+                            </label>
+                            <textarea id="@($"obs-renovacion-{solicitudId}")"
+                                      class="fiori-textarea"
+                                      rows="2"
+                                      maxlength="500"
+                                      placeholder="Ingrese observaciones o el motivo de rechazo documentado..."
+                                      value="@ObtenerTextoDiccionario(_observacionesRenovacion, solicitudId)"
+                                      @oninput="(ChangeEventArgs e) => ActualizarTextoDiccionario(_observacionesRenovacion, solicitudId, e.Value?.ToString())"></textarea>
+                        </div>
+
+                        <div class="fiori-actions-row">
+                            <button type="button"
+                                    class="fiori-btn fiori-btn--positive"
+                                    disabled="@_procesandoAccion"
+                                    @onclick="() => AprobarRenovacionAsync(solicitudId)">
+                                Aprobar y emitir token
+                            </button>
+                            <button type="button"
+                                    class="fiori-btn fiori-btn--negative"
+                                    disabled="@_procesandoAccion"
+                                    @onclick="() => RechazarRenovacionAsync(solicitudId)">
+                                Rechazar solicitud
+                            </button>
+                        </div>
+                    </article>
+                }
+            }
+        </section>
+    }
+    else if (_tabActiva == TabPasesEvento)
+    {
+        <section class="fiori-card">
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Emitir Nuevo Pase por Evento</h3>
+                <StatusBadge Text="Emisión automática de Token QR Tipo Evento" Variant="informative" />
+            </div>
+
+            <div class="fiori-grid fiori-grid--2">
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="evento-persona">Persona asistente</label>
+                    <select id="evento-persona" class="fiori-select" @bind="_eventoPersonaId">
+                        <option value="0">-- Seleccione una persona activa --</option>
+                        @foreach (PersonaResumenDto persona in _personasActivas)
+                        {
+                            <option value="@persona.Id">@FormatearEtiquetaPersona(persona)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="evento-nombre">Nombre del evento</label>
+                    <input id="evento-nombre"
+                           type="text"
+                           class="fiori-input"
+                           maxlength="200"
+                           placeholder="Ej. Congreso de Ingeniería UMAD 2026"
+                           @bind="_eventoNombre" />
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="evento-inicio">Inicio de vigencia (hora local)</label>
+                    <input id="evento-inicio"
+                           type="datetime-local"
+                           class="fiori-input"
+                           value="@_eventoInicioLocalTexto"
+                           @onchange="(ChangeEventArgs e) => _eventoInicioLocalTexto = e.Value?.ToString() ?? string.Empty" />
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="evento-fin">Fin de vigencia (hora local)</label>
+                    <input id="evento-fin"
+                           type="datetime-local"
+                           class="fiori-input"
+                           value="@_eventoFinLocalTexto"
+                           @onchange="(ChangeEventArgs e) => _eventoFinLocalTexto = e.Value?.ToString() ?? string.Empty" />
+                </div>
+            </div>
+
+            <div class="fiori-form-group">
+                <label class="fiori-label" for="evento-descripcion">Descripción / detalles operativos (opcional)</label>
+                <textarea id="evento-descripcion"
+                          class="fiori-textarea"
+                          rows="2"
+                          maxlength="500"
+                          placeholder="Auditorio, zona autorizada o instrucciones para caseta..."
+                          @bind="_eventoDescripcion"></textarea>
+            </div>
+
+            <div class="fiori-actions-row">
+                <button type="button"
+                        class="fiori-btn fiori-btn--emphasized"
+                        disabled="@_procesandoAccion"
+                        @onclick="CrearPaseEventoAsync">
+                    Emitir pase por evento
+                </button>
+            </div>
+        </section>
+
+        <section class="fiori-card">
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Pases por Evento Registrados</h3>
+                <StatusBadge Text="@($"{_pasesEvento.Count} registros")" Variant="neutral" />
+            </div>
+
+            @if (_pasesEvento.Count == 0)
+            {
+                <div class="fiori-empty-state">
+                    Aún no se han emitido pases por evento en SQLite.
+                </div>
+            }
+            else
+            {
+                <div class="fiori-table-wrap">
+                    <table class="fiori-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Evento</th>
+                                <th>Asistente</th>
+                                <th>Vigencia (local)</th>
+                                <th>Token QR</th>
+                                <th>Emitido por</th>
+                                <th>Sync</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (PaseEvento pase in _pasesEvento)
+                            {
+                                <tr>
+                                    <td>#@pase.Id</td>
+                                    <td>
+                                        <strong>@pase.NombreEvento</strong>
+                                        @if (!string.IsNullOrWhiteSpace(pase.Descripcion))
+                                        {
+                                            <div class="fiori-page-subtitle">@pase.Descripcion</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        @(pase.Persona?.NombreCompleto ?? $"Persona #{pase.PersonaId}")
+                                        @if (!string.IsNullOrWhiteSpace(pase.Persona?.Correo))
+                                        {
+                                            <div class="fiori-page-subtitle">@pase.Persona.Correo</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div>@FormatearHoraLocal(pase.FechaInicioEvento)</div>
+                                        <div class="fiori-page-subtitle">hasta @FormatearHoraLocal(pase.FechaFinEvento)</div>
+                                    </td>
+                                    <td>
+                                        @if (pase.TokenAcceso is not null)
+                                        {
+                                            <StatusBadge Text="@ObtenerEstadoTokenTexto(pase.TokenAcceso)"
+                                                         Variant="@ObtenerEstadoTokenVariante(pase.TokenAcceso)" />
+                                            <div class="fiori-mono">Token #@pase.TokenAccesoId</div>
+                                        }
+                                        else
+                                        {
+                                            <StatusBadge Text="Sin token" Variant="neutral" />
+                                        }
+                                    </td>
+                                    <td>@(pase.CreadoPor?.NombreCompleto ?? $"Persona #{pase.CreadoPorPersonaId}")</td>
+                                    <td>
+                                        <StatusBadge Text="@pase.EstadoSincronizacion.ToString()"
+                                                     Variant="@ObtenerVarianteSync(pase.EstadoSincronizacion)" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+    else if (_tabActiva == TabTokens)
+    {
+        <section class="fiori-card">
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Emitir Nuevo Token QR Firmado (HMAC-SHA256)</h3>
+                <StatusBadge Text="Emisión administrativa" Variant="informative" />
+            </div>
+
+            <div class="fiori-grid fiori-grid--3">
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="token-persona">Titular</label>
+                    <select id="token-persona" class="fiori-select" @bind="_tokenPersonaId">
+                        <option value="0">-- Seleccione una persona activa --</option>
+                        @foreach (PersonaResumenDto persona in _personasActivas)
+                        {
+                            <option value="@persona.Id">@FormatearEtiquetaPersona(persona)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="token-tipo">Tipo de pase</label>
+                    <select id="token-tipo" class="fiori-select" @bind="_tokenTipoPase">
+                        @foreach (TipoPase tipo in Enum.GetValues<TipoPase>())
+                        {
+                            <option value="@tipo">@tipo</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="token-horas">Vigencia personalizada en horas (opcional)</label>
+                    <input id="token-horas"
+                           type="number"
+                           min="0"
+                           max="8760"
+                           class="fiori-input"
+                           placeholder="0 = vigencia estándar del tipo"
+                           @bind="_tokenVigenciaHoras" />
+                </div>
+            </div>
+
+            <div class="fiori-actions-row">
+                <label class="fiori-label" style="display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer;">
+                    <input type="checkbox" @bind="_tokenRevocarPrevios" />
+                    Revocar tokens previos activos del titular
+                </label>
+
+                <button type="button"
+                        class="fiori-btn fiori-btn--emphasized"
+                        disabled="@_procesandoAccion"
+                        @onclick="EmitirTokenAsync">
+                    Emitir token QR
+                </button>
+            </div>
+        </section>
+
+        <section class="fiori-card">
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Tokens Activos Globales y Revocación</h3>
+                <div class="fiori-actions-row">
+                    <input type="search"
+                           class="fiori-input"
+                           style="max-width: 280px;"
+                           placeholder="Filtrar por nombre, correo o tipo..."
+                           @bind="_filtroTokens"
+                           @bind:event="oninput" />
+                </div>
+            </div>
+
+            @{
+                IReadOnlyList<TokenAcceso> tokensFiltrados = ObtenerTokensFiltrados();
+            }
+
+            @if (tokensFiltrados.Count == 0)
+            {
+                <div class="fiori-empty-state">
+                    No se encontraron tokens activos que coincidan con el criterio actual.
+                </div>
+            }
+            else
+            {
+                <div class="fiori-table-wrap">
+                    <table class="fiori-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Titular</th>
+                                <th>Tipo</th>
+                                <th>Vigencia (local)</th>
+                                <th>Firma QR</th>
+                                <th>Revocación con motivo obligatorio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (TokenAcceso token in tokensFiltrados)
+                            {
+                                int tokenId = token.Id;
+
+                                <tr>
+                                    <td>#@token.Id</td>
+                                    <td>
+                                        <strong>@(token.Persona?.NombreCompleto ?? $"Persona #{token.PersonaId}")</strong>
+                                        <div class="fiori-page-subtitle">
+                                            @(token.Persona?.Correo ?? "Sin correo")
+                                            @if (!string.IsNullOrWhiteSpace(token.Persona?.Matricula))
+                                            {
+                                                <span> · @token.Persona.Matricula</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <StatusBadge Text="@token.TipoPase.ToString()" Variant="informative" />
+                                    </td>
+                                    <td>
+                                        <div>Emitido: @FormatearHoraLocal(token.FechaEmision)</div>
+                                        <div class="fiori-page-subtitle">Expira: @FormatearHoraLocal(token.FechaExpiracion)</div>
+                                    </td>
+                                    <td class="fiori-mono">@AbreviarCodigo(token.CodigoFirmado)</td>
+                                    <td>
+                                        <div class="fiori-actions-row">
+                                            <input type="text"
+                                                   class="fiori-input"
+                                                   style="min-width: 190px; max-width: 240px;"
+                                                   maxlength="250"
+                                                   placeholder="Motivo de revocación..."
+                                                   value="@ObtenerTextoDiccionario(_motivosRevocacion, tokenId)"
+                                                   @oninput="(ChangeEventArgs e) => ActualizarTextoDiccionario(_motivosRevocacion, tokenId, e.Value?.ToString())" />
+                                            <button type="button"
+                                                    class="fiori-btn fiori-btn--negative fiori-btn--compact"
+                                                    disabled="@_procesandoAccion"
+                                                    @onclick="() => RevocarTokenAsync(tokenId)">
+                                                Revocar
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+    else if (_tabActiva == TabIncidencias)
+    {
+        <section class="fiori-card">
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Gestión de Incidencias ITIL 4</h3>
+                <div class="fiori-actions-row">
+                    <button type="button"
+                            class="fiori-btn @(!_mostrarTodasIncidencias ? "fiori-btn--emphasized" : "fiori-btn--standard") fiori-btn--compact"
+                            @onclick="() => CambiarFiltroIncidenciasAsync(false)">
+                        Abiertas / Investigación (@_incidenciasAbiertas.Count)
+                    </button>
+                    <button type="button"
+                            class="fiori-btn @(_mostrarTodasIncidencias ? "fiori-btn--emphasized" : "fiori-btn--standard") fiori-btn--compact"
+                            @onclick="() => CambiarFiltroIncidenciasAsync(true)">
+                        Historial completo (@_todasIncidencias.Count)
+                    </button>
+                </div>
+            </div>
+
+            @{
+                IReadOnlyList<Incidencia> incidenciasVisibles = _mostrarTodasIncidencias ? _todasIncidencias : _incidenciasAbiertas;
+            }
+
+            @if (incidenciasVisibles.Count == 0)
+            {
+                <div class="fiori-empty-state">
+                    No existen incidencias para el filtro seleccionado.
+                </div>
+            }
+            else
+            {
+                @foreach (Incidencia incidencia in incidenciasVisibles)
+                {
+                    int incidenciaId = incidencia.Id;
+                    string? rutaEvidencia = incidencia.RutaEvidenciaFoto;
+                    _evidenciasDataUri.TryGetValue(incidenciaId, out string? evidenciaDataUri);
+
+                    <article class="fiori-card">
+                        <div class="fiori-card-header">
+                            <div>
+                                <h4 class="fiori-card-title">Incidencia #@incidencia.Id · @incidencia.Titulo</h4>
+                                <p class="fiori-page-subtitle">
+                                    Reportada por: @(incidencia.ReportadoPor?.NombreCompleto ?? $"Persona #{incidencia.ReportadoPorPersonaId}")
+                                    · @FormatearHoraLocal(incidencia.FechaReporteUtc)
+                                    @if (incidencia.RegistroAccesoId.HasValue)
+                                    {
+                                        <span> · Registro de acceso #@incidencia.RegistroAccesoId</span>
+                                    }
+                                    @if (incidencia.FechaResolucionUtc.HasValue)
+                                    {
+                                        <span> · Resuelta: @FormatearHoraLocal(incidencia.FechaResolucionUtc.Value)</span>
+                                    }
+                                </p>
+                            </div>
+                            <div class="fiori-actions-row">
+                                <StatusBadge Text="@($"Severidad: {incidencia.Severidad}")"
+                                             Variant="@ObtenerVarianteSeveridad(incidencia.Severidad)" />
+                                <StatusBadge Text="@ObtenerEtiquetaEstadoIncidencia(incidencia.Estado)"
+                                             Variant="@ObtenerVarianteEstadoIncidencia(incidencia.Estado)" />
+                            </div>
+                        </div>
+
+                        <p style="margin-top: 0;">@incidencia.Descripcion</p>
+
+                        @if (!string.IsNullOrWhiteSpace(incidencia.RutaEvidenciaFoto))
+                        {
+                            <div class="fiori-form-group">
+                                <div class="fiori-actions-row">
+                                    <span class="fiori-label">Evidencia fotográfica:</span>
+                                    <span class="fiori-mono">@incidencia.RutaEvidenciaFoto</span>
+                                    @if (evidenciaDataUri is null)
+                                    {
+                                        <button type="button"
+                                                class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                                @onclick="() => CargarEvidenciaIncidenciaAsync(incidenciaId, rutaEvidencia)">
+                                            Ver evidencia
+                                        </button>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(evidenciaDataUri))
+                                {
+                                    <img src="@evidenciaDataUri"
+                                         alt="@($"Evidencia fotográfica de incidencia #{incidenciaId}")"
+                                         class="fiori-evidence-preview" />
+                                }
+                            </div>
+                        }
+
+                        <div class="fiori-actions-row">
+                            <span class="fiori-label">Actualizar estado ITIL:</span>
+                            @if (incidencia.Estado != EstadoIncidencia.EnInvestigacion)
+                            {
+                                <button type="button"
+                                        class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                        disabled="@_procesandoAccion"
+                                        @onclick="() => ActualizarEstadoIncidenciaAsync(incidenciaId, EstadoIncidencia.EnInvestigacion)">
+                                    En investigación
+                                </button>
+                            }
+                            @if (incidencia.Estado != EstadoIncidencia.Resuelta)
+                            {
+                                <button type="button"
+                                        class="fiori-btn fiori-btn--positive fiori-btn--compact"
+                                        disabled="@_procesandoAccion"
+                                        @onclick="() => ActualizarEstadoIncidenciaAsync(incidenciaId, EstadoIncidencia.Resuelta)">
+                                    Marcar resuelta
+                                </button>
+                            }
+                            @if (incidencia.Estado != EstadoIncidencia.Cerrada)
+                            {
+                                <button type="button"
+                                        class="fiori-btn fiori-btn--emphasized fiori-btn--compact"
+                                        disabled="@_procesandoAccion"
+                                        @onclick="() => ActualizarEstadoIncidenciaAsync(incidenciaId, EstadoIncidencia.Cerrada)">
+                                    Cerrar incidencia
+                                </button>
+                            }
+                            @if (incidencia.Estado is EstadoIncidencia.Resuelta or EstadoIncidencia.Cerrada)
+                            {
+                                <button type="button"
+                                        class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                        disabled="@_procesandoAccion"
+                                        @onclick="() => ActualizarEstadoIncidenciaAsync(incidenciaId, EstadoIncidencia.Abierta)">
+                                    Reabrir
+                                </button>
+                            }
+                        </div>
+                    </article>
+                }
+            }
+        </section>
+    }
+    else if (_tabActiva == TabSync)
+    {
+        <section class="fiori-card">
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Continuidad Operativa Offline-First (Cola de Sincronización)</h3>
+                <StatusBadge Text="@(_resumenCola?.UltimoIntentoUtc.HasValue == true ? $"Último intento: {FormatearHoraLocal(_resumenCola.UltimoIntentoUtc.Value)}" : "Sin intentos registrados")"
+                             Variant="informative" />
+            </div>
+
+            <div class="fiori-grid fiori-grid--4" style="margin-bottom: 1rem;">
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Accesos pendientes</span>
+                    <span class="fiori-kpi-value">@(_resumenCola?.Pendientes ?? 0)</span>
+                    <span class="fiori-kpi-sub">En espera de despacho</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Accesos sincronizados</span>
+                    <span class="fiori-kpi-value">@(_resumenCola?.Sincronizados ?? 0)</span>
+                    <span class="fiori-kpi-sub">Confirmados</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Accesos con error</span>
+                    <span class="fiori-kpi-value">@(_resumenCola?.ConError ?? 0)</span>
+                    <span class="fiori-kpi-sub">Disponibles para reintento</span>
+                </div>
+                <div class="fiori-kpi">
+                    <span class="fiori-kpi-label">Otras entidades pendientes</span>
+                    <span class="fiori-kpi-value">
+                        @((_resumenCola?.PasesEventoPendientes ?? 0) + (_resumenCola?.RenovacionesPendientes ?? 0) + (_resumenCola?.IncidenciasPendientes ?? 0))
+                    </span>
+                    <span class="fiori-kpi-sub">
+                        Eventos: @(_resumenCola?.PasesEventoPendientes ?? 0) · Renov.: @(_resumenCola?.RenovacionesPendientes ?? 0) · Inc.: @(_resumenCola?.IncidenciasPendientes ?? 0)
+                    </span>
+                </div>
+            </div>
+
+            @if (_ultimoResultadoSync is not null)
+            {
+                <div class="sap-messagestrip @ObtenerClaseResultadoSync(_ultimoResultadoSync)">
+                    <div>
+                        <strong>Última ejecución de sincronización:</strong> @_ultimoResultadoSync.Mensaje
+                        <div class="fiori-page-subtitle">
+                            Procesados: @_ultimoResultadoSync.Procesados · Exitosos: @_ultimoResultadoSync.Exitosos · Fallidos: @_ultimoResultadoSync.Fallidos · Sin red: @(_ultimoResultadoSync.SinRed ? "Sí" : "No")
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="fiori-actions-row" style="margin-bottom: 1rem;">
+                <button type="button"
+                        class="fiori-btn fiori-btn--emphasized"
+                        disabled="@_procesandoAccion"
+                        @onclick="() => SincronizarColaAsync(usarSimulacionControlada: true)">
+                    Sincronizar cola (simulación controlada)
+                </button>
+                <button type="button"
+                        class="fiori-btn fiori-btn--standard"
+                        disabled="@_procesandoAccion"
+                        @onclick="() => SincronizarColaAsync(usarSimulacionControlada: false)">
+                    Verificar estado sin despachador remoto
+                </button>
+            </div>
+
+            <h4 class="fiori-card-title" style="margin-bottom: 0.75rem;">Lote pendiente en SQLite (@_registrosPendientesSync.Count)</h4>
+
+            @if (_registrosPendientesSync.Count == 0)
+            {
+                <div class="fiori-empty-state">
+                    No existen registros de acceso pendientes o con error en la cola local.
+                </div>
+            }
+            else
+            {
+                <div class="fiori-table-wrap">
+                    <table class="fiori-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Persona</th>
+                                <th>Punto de acceso</th>
+                                <th>Movimiento</th>
+                                <th>Fecha (local)</th>
+                                <th>Estado</th>
+                                <th>Reintentos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (RegistroAcceso registro in _registrosPendientesSync)
+                            {
+                                <tr>
+                                    <td>#@registro.Id</td>
+                                    <td>@(registro.Persona?.NombreCompleto ?? $"Persona #{registro.PersonaId}")</td>
+                                    <td>@registro.PuntoAcceso</td>
+                                    <td>@registro.TipoMovimiento (@registro.Resultado)</td>
+                                    <td>@FormatearHoraLocal(registro.FechaHora)</td>
+                                    <td>
+                                        <StatusBadge Text="@registro.EstadoSincronizacion.ToString()"
+                                                     Variant="@ObtenerVarianteSync(registro.EstadoSincronizacion)" />
+                                    </td>
+                                    <td>@registro.Reintentos</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+    else if (_tabActiva == TabUsuarios)
+    {
+        <section class="fiori-card">
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Alta de Nuevo Usuario</h3>
+                <StatusBadge Text="Aprovisionamiento seguro PBKDF2-SHA256" Variant="informative" />
+            </div>
+
+            <div class="fiori-grid fiori-grid--3">
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="usuario-nombre">Nombre completo</label>
+                    <input id="usuario-nombre"
+                           type="text"
+                           class="fiori-input"
+                           maxlength="150"
+                           placeholder="Ej. Ana Sofía Morales Pérez"
+                           disabled="@_procesandoAccion"
+                           @bind="_nuevoUsuarioNombre" />
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="usuario-correo">Correo institucional</label>
+                    <input id="usuario-correo"
+                           type="email"
+                           class="fiori-input"
+                           maxlength="200"
+                           placeholder="nombre.apellido@umad.edu.mx"
+                           disabled="@_procesandoAccion"
+                           @bind="_nuevoUsuarioCorreo" />
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="usuario-matricula">Matrícula (opcional)</label>
+                    <input id="usuario-matricula"
+                           type="text"
+                           class="fiori-input"
+                           maxlength="40"
+                           placeholder="Ej. A2026015 (opcional)"
+                           disabled="@_procesandoAccion"
+                           @bind="_nuevoUsuarioMatricula" />
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="usuario-rol">Rol institucional</label>
+                    <select id="usuario-rol"
+                            class="fiori-select"
+                            disabled="@_procesandoAccion"
+                            @bind="_nuevoUsuarioRol">
+                        @foreach (RolPersona rol in Enum.GetValues<RolPersona>())
+                        {
+                            <option value="@rol">@ObtenerEtiquetaRolPersona(rol)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="usuario-password">Contraseña (mín. 8 caracteres)</label>
+                    <input id="usuario-password"
+                           type="password"
+                           class="fiori-input"
+                           autocomplete="new-password"
+                           placeholder="Mínimo 8 caracteres"
+                           disabled="@_procesandoAccion"
+                           @bind="_nuevoUsuarioPassword" />
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="usuario-password-confirmar">Confirmar contraseña</label>
+                    <input id="usuario-password-confirmar"
+                           type="password"
+                           class="fiori-input"
+                           autocomplete="new-password"
+                           placeholder="Repite la contraseña"
+                           disabled="@_procesandoAccion"
+                           @bind="_nuevoUsuarioConfirmarPassword" />
+                </div>
+            </div>
+
+            <div class="fiori-grid fiori-grid--2" style="align-items: end;">
+                <div class="fiori-form-group">
+                    <label class="fiori-label" style="display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer;">
+                        <input type="checkbox"
+                               disabled="@_procesandoAccion"
+                               @bind="_nuevoUsuarioEmitirTokenInicial" />
+                        Emitir pase QR inicial al crear la cuenta
+                    </label>
+                    <span class="fiori-field-hint">
+                        Si se activa, el usuario recibirá de inmediato un token QR firmado HMAC-SHA256 listo para acceso.
+                    </span>
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="usuario-tipo-pase">Tipo de pase inicial</label>
+                    <select id="usuario-tipo-pase"
+                            class="fiori-select"
+                            disabled="@(_procesandoAccion || !_nuevoUsuarioEmitirTokenInicial)"
+                            @bind="_nuevoUsuarioTipoPaseInicial">
+                        @foreach (TipoPase tipo in Enum.GetValues<TipoPase>())
+                        {
+                            <option value="@tipo">@tipo</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="fiori-actions-row">
+                <button type="button"
+                        class="fiori-btn fiori-btn--emphasized"
+                        disabled="@_procesandoAccion"
+                        @onclick="CrearUsuarioAsync">
+                    Crear usuario
+                </button>
+            </div>
+        </section>
+
+        <section class="fiori-card">
+            @{
+                IReadOnlyList<UsuarioDetalleDto> usuariosFiltrados = ObtenerUsuariosFiltrados();
+            }
+
+            <div class="fiori-card-header">
+                <h3 class="fiori-card-title">Directorio y Gestión de Usuarios</h3>
+                <StatusBadge Text="@($"{usuariosFiltrados.Count} de {_usuarios.Count} usuarios")" Variant="neutral" />
+            </div>
+
+            <div class="fiori-filter-bar">
+                <div class="fiori-field">
+                    <label class="fiori-label" for="filtro-usuarios-texto">Buscar usuario</label>
+                    <input id="filtro-usuarios-texto"
+                           type="search"
+                           class="fiori-input"
+                           placeholder="Nombre, correo o matrícula..."
+                           @bind="_filtroUsuarios"
+                           @bind:event="oninput" />
+                </div>
+
+                <div class="fiori-field">
+                    <label class="fiori-label" for="filtro-usuarios-rol">Filtrar por rol</label>
+                    <select id="filtro-usuarios-rol"
+                            class="fiori-select"
+                            @bind="_filtroRolUsuarios">
+                        <option value="">Todos los roles</option>
+                        @foreach (RolPersona rol in Enum.GetValues<RolPersona>())
+                        {
+                            <option value="@rol.ToString()">@ObtenerEtiquetaRolPersona(rol)</option>
+                        }
+                    </select>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_filtroUsuarios) || !string.IsNullOrWhiteSpace(_filtroRolUsuarios))
+                {
+                    <div class="fiori-field">
+                        <button type="button"
+                                class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                @onclick="LimpiarFiltrosUsuarios">
+                            Limpiar filtros
+                        </button>
+                    </div>
+                }
+            </div>
+
+            @if (usuariosFiltrados.Count == 0)
+            {
+                <div class="fiori-empty-state">
+                    No se encontraron usuarios que coincidan con los criterios de búsqueda actuales.
+                </div>
+            }
+            else
+            {
+                <div class="fiori-table-wrap">
+                    <table class="fiori-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Matrícula</th>
+                                <th>Rol institucional</th>
+                                <th>Estado</th>
+                                <th>Tokens activos</th>
+                                <th>Fecha de alta</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (UsuarioDetalleDto usuario in usuariosFiltrados)
+                            {
+                                int usuarioId = usuario.Id;
+                                bool esCuentaPropia = usuarioId == adminActual.PersonaId;
+                                RolPersona rolSeleccionado = ObtenerRolSeleccionadoUsuario(usuario);
+                                bool rolModificado = rolSeleccionado != usuario.Rol;
+                                bool panelResetAbierto = _usuarioIdResetPassword == usuarioId;
+
+                                <tr @key="@($"usuario-{usuarioId}")" class="@(panelResetAbierto ? "fiori-row-selected" : string.Empty)">
+                                    <td>
+                                        <strong>@usuario.NombreCompleto</strong>
+                                        @if (esCuentaPropia)
+                                        {
+                                            <StatusBadge Text="Tu cuenta" Variant="informative" />
+                                        }
+                                        <div class="fiori-page-subtitle">@usuario.Correo</div>
+                                    </td>
+                                    <td class="fiori-mono">
+                                        @(string.IsNullOrWhiteSpace(usuario.Matricula) ? "—" : usuario.Matricula)
+                                    </td>
+                                    <td>
+                                        <div class="fiori-actions-row">
+                                            <select class="fiori-select"
+                                                    style="min-width: 145px; max-width: 175px;"
+                                                    aria-label="@($"Rol institucional de {usuario.NombreCompleto}")"
+                                                    value="@rolSeleccionado.ToString()"
+                                                    disabled="@_procesandoAccion"
+                                                    @onchange="(ChangeEventArgs e) => ActualizarSeleccionRolUsuario(usuarioId, e.Value?.ToString())">
+                                                @foreach (RolPersona rol in Enum.GetValues<RolPersona>())
+                                                {
+                                                    <option value="@rol.ToString()">@ObtenerEtiquetaRolPersona(rol)</option>
+                                                }
+                                            </select>
+                                            <button type="button"
+                                                    class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                                    disabled="@(_procesandoAccion || !rolModificado)"
+                                                    @onclick="() => ActualizarRolUsuarioAsync(usuarioId)">
+                                                Guardar rol
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <StatusBadge Text="@(usuario.Activo ? "Activo" : "Inactivo")"
+                                                     Variant="@(usuario.Activo ? "positive" : "negative")" />
+                                    </td>
+                                    <td>
+                                        <StatusBadge Text="@($"{usuario.TokensActivosCount} activos")"
+                                                     Variant="@(usuario.TokensActivosCount > 0 ? "informative" : "neutral")" />
+                                    </td>
+                                    <td>@FormatearHoraLocal(usuario.FechaCreacionUtc)</td>
+                                    <td>
+                                        <div class="fiori-actions-row">
+                                            <button type="button"
+                                                    class="fiori-btn @(usuario.Activo ? "fiori-btn--negative" : "fiori-btn--positive") fiori-btn--compact"
+                                                    disabled="@(_procesandoAccion || esCuentaPropia)"
+                                                    title="@(esCuentaPropia ? "No puedes desactivar tu propia cuenta administradora activa." : string.Empty)"
+                                                    @onclick="() => ActualizarEstadoUsuarioAsync(usuarioId, !usuario.Activo)">
+                                                @(usuario.Activo ? "Desactivar" : "Activar")
+                                            </button>
+                                            <button type="button"
+                                                    class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                                    disabled="@_procesandoAccion"
+                                                    @onclick="() => AlternarPanelResetContrasena(usuarioId)">
+                                                @(panelResetAbierto ? "Cerrar clave" : "Restablecer clave")
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                @if (panelResetAbierto)
+                                {
+                                    <tr @key="@($"reset-{usuarioId}")" class="fiori-row-selected">
+                                        <td colspan="7">
+                                            <div class="fiori-detail-panel">
+                                                <div class="fiori-card-header" style="margin-bottom: 0.75rem;">
+                                                    <h4 class="fiori-card-title">
+                                                        Restablecer contraseña · @usuario.NombreCompleto (@usuario.Correo)
+                                                    </h4>
+                                                    <StatusBadge Text="Hash PBKDF2-SHA256" Variant="critical" />
+                                                </div>
+
+                                                <div class="fiori-grid fiori-grid--2">
+                                                    <div class="fiori-form-group">
+                                                        <label class="fiori-label" for="@($"reset-pass-{usuarioId}")">
+                                                            Nueva contraseña (mín. 8 caracteres)
+                                                        </label>
+                                                        <input id="@($"reset-pass-{usuarioId}")"
+                                                               type="password"
+                                                               class="fiori-input"
+                                                               autocomplete="new-password"
+                                                               placeholder="Ingresa la nueva contraseña"
+                                                               disabled="@_procesandoAccion"
+                                                               @bind="_resetPasswordNueva" />
+                                                    </div>
+
+                                                    <div class="fiori-form-group">
+                                                        <label class="fiori-label" for="@($"reset-pass-confirm-{usuarioId}")">
+                                                            Confirmar nueva contraseña
+                                                        </label>
+                                                        <input id="@($"reset-pass-confirm-{usuarioId}")"
+                                                               type="password"
+                                                               class="fiori-input"
+                                                               autocomplete="new-password"
+                                                               placeholder="Repite la nueva contraseña"
+                                                               disabled="@_procesandoAccion"
+                                                               @bind="_resetPasswordConfirmacion" />
+                                                    </div>
+                                                </div>
+
+                                                <div class="fiori-actions-row">
+                                                    <button type="button"
+                                                            class="fiori-btn fiori-btn--emphasized fiori-btn--compact"
+                                                            disabled="@_procesandoAccion"
+                                                            @onclick="() => RestablecerContrasenaUsuarioAsync(usuarioId)">
+                                                        Guardar nueva contraseña
+                                                    </button>
+                                                    <button type="button"
+                                                            class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                                            disabled="@_procesandoAccion"
+                                                            @onclick="CerrarPanelResetContrasena">
+                                                        Cancelar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+}
+
+@code {
+    // Clave de pestaña para gestión de renovaciones pendientes.
+    private const string TabRenovaciones = "renovaciones";
+
+    // Clave de pestaña para creación y listado de pases por evento.
+    private const string TabPasesEvento = "pases-evento";
+
+    // Clave de pestaña para administración y revocación de tokens globales.
+    private const string TabTokens = "tokens";
+
+    // Clave de pestaña para seguimiento de incidencias ITIL 4.
+    private const string TabIncidencias = "incidencias";
+
+    // Clave de pestaña para monitoreo y sincronización de la cola offline.
+    private const string TabSync = "sync";
+
+    // Clave de pestaña para aprovisionamiento y directorio de usuarios institucionales.
+    private const string TabUsuarios = "usuarios";
+
+    // Pestaña actualmente visible dentro del panel administrativo.
+    private string _tabActiva = TabRenovaciones;
+
+    // Indica si el panel se encuentra cargando colecciones desde SQLite.
+    private bool _cargando;
+
+    // Indica si existe una operación administrativa de escritura en curso.
+    private bool _procesandoAccion;
+
+    // Mensaje de error seguro mostrado en la vista.
+    private string? _mensajeError;
+
+    // Mensaje actual de notificación toast Fiori.
+    private string? _toastMensaje;
+
+    // Variante visual semántica del toast activo.
+    private string _toastVariante = "informative";
+
+    // Listado de personas activas para selectores de pases y emisión de tokens.
+    private IReadOnlyList<PersonaResumenDto> _personasActivas = Array.Empty<PersonaResumenDto>();
+
+    // Listado de solicitudes de renovación en estado pendiente.
+    private IReadOnlyList<SolicitudRenovacion> _renovacionesPendientes = Array.Empty<SolicitudRenovacion>();
+
+    // Dictámenes de clasificación IA asociados a cada solicitud de renovación pendiente.
+    private readonly Dictionary<int, ClasificacionVisitaResult> _dictamenesIaRenovacion = new();
+
+    // Observaciones o motivos de rechazo capturados por solicitud de renovación.
+    private readonly Dictionary<int, string> _observacionesRenovacion = new();
+
+    // Listado global de pases por evento persistidos en SQLite.
+    private IReadOnlyList<PaseEvento> _pasesEvento = Array.Empty<PaseEvento>();
+
+    // Identificador de la persona seleccionada para el nuevo pase por evento.
+    private int _eventoPersonaId;
+
+    // Nombre oficial del evento institucional a emitir.
+    private string _eventoNombre = string.Empty;
+
+    // Descripción operativa opcional del pase por evento.
+    private string _eventoDescripcion = string.Empty;
+
+    // Fecha y hora local de inicio del evento en formato compatible con input datetime-local.
+    private string _eventoInicioLocalTexto = string.Empty;
+
+    // Fecha y hora local de fin del evento en formato compatible con input datetime-local.
+    private string _eventoFinLocalTexto = string.Empty;
+
+    // Listado global de tokens activos y no revocados.
+    private IReadOnlyList<TokenAcceso> _tokensActivos = Array.Empty<TokenAcceso>();
+
+    // Texto de búsqueda para filtrar la tabla de tokens activos.
+    private string _filtroTokens = string.Empty;
+
+    // Motivos de revocación capturados por identificador de token.
+    private readonly Dictionary<int, string> _motivosRevocacion = new();
+
+    // Identificador de la persona seleccionada para emisión directa de token.
+    private int _tokenPersonaId;
+
+    // Modalidad de pase seleccionada para la nueva emisión de token.
+    private TipoPase _tokenTipoPase = TipoPase.Temporal;
+
+    // Vigencia opcional en horas para el nuevo token emitido (0 aplica vigencia estándar).
+    private int _tokenVigenciaHoras;
+
+    // Indica si se deben revocar tokens previos activos al emitir uno nuevo.
+    private bool _tokenRevocarPrevios = true;
+
+    // Listado de incidencias abiertas o en investigación.
+    private IReadOnlyList<Incidencia> _incidenciasAbiertas = Array.Empty<Incidencia>();
+
+    // Listado completo de incidencias para consulta histórica opcional.
+    private IReadOnlyList<Incidencia> _todasIncidencias = Array.Empty<Incidencia>();
+
+    // Controla si la pestaña de incidencias muestra el historial completo o solo abiertas.
+    private bool _mostrarTodasIncidencias;
+
+    // Caché temporal de vistas previas Data URI de evidencias fotográficas por incidencia.
+    private readonly Dictionary<int, string> _evidenciasDataUri = new();
+
+    // Resumen agregado actual de la cola de sincronización offline.
+    private SyncQueueSummary? _resumenCola;
+
+    // Lote actual de registros de acceso pendientes o con error en SQLite.
+    private IReadOnlyList<RegistroAcceso> _registrosPendientesSync = Array.Empty<RegistroAcceso>();
+
+    // Último resultado devuelto por ProcesarColaPendienteAsync.
+    private SyncProcessResult? _ultimoResultadoSync;
+
+    // Listado completo de usuarios institucionales administrables desde SQLite.
+    private IReadOnlyList<UsuarioDetalleDto> _usuarios = Array.Empty<UsuarioDetalleDto>();
+
+    // Texto de búsqueda para filtrar el directorio de usuarios por nombre, correo o matrícula.
+    private string _filtroUsuarios = string.Empty;
+
+    // Filtro opcional de rol institucional para el directorio de usuarios.
+    private string _filtroRolUsuarios = string.Empty;
+
+    // Selección temporal de rol por identificador de usuario antes de aplicar el cambio.
+    private readonly Dictionary<int, RolPersona> _rolesSeleccionadosPorUsuario = new();
+
+    // Identificador del usuario cuyo panel inline de restablecimiento de contraseña está abierto.
+    private int? _usuarioIdResetPassword;
+
+    // Nueva contraseña capturada temporalmente en el panel inline de restablecimiento.
+    private string _resetPasswordNueva = string.Empty;
+
+    // Confirmación de la nueva contraseña capturada en el panel inline de restablecimiento.
+    private string _resetPasswordConfirmacion = string.Empty;
+
+    // Nombre completo del nuevo usuario en el formulario de alta.
+    private string _nuevoUsuarioNombre = string.Empty;
+
+    // Correo electrónico institucional del nuevo usuario en el formulario de alta.
+    private string _nuevoUsuarioCorreo = string.Empty;
+
+    // Matrícula o clave opcional del nuevo usuario en el formulario de alta.
+    private string _nuevoUsuarioMatricula = string.Empty;
+
+    // Rol institucional seleccionado para el nuevo usuario en el formulario de alta.
+    private RolPersona _nuevoUsuarioRol = RolPersona.Estudiante;
+
+    // Contraseña inicial capturada para el alta de usuario.
+    private string _nuevoUsuarioPassword = string.Empty;
+
+    // Confirmación de contraseña inicial para validar coincidencia antes de guardar.
+    private string _nuevoUsuarioConfirmarPassword = string.Empty;
+
+    // Indica si se debe emitir automáticamente un pase QR inicial al crear el usuario.
+    private bool _nuevoUsuarioEmitirTokenInicial = true;
+
+    // Tipo de pase QR seleccionado cuando se emite un token inicial al crear el usuario.
+    private TipoPase _nuevoUsuarioTipoPaseInicial = TipoPase.Permanente;
+
+    /// <summary>
+    /// Inicializa fechas por defecto del formulario, suscribe cambios de sesión y carga los módulos administrativos si el rol es válido.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    protected override async Task OnInitializedAsync()
+    {
+        InicializarVentanaEventoPorDefecto();
+        SesionActual.OnSesionCambiada += ManejarCambioSesion;
+
+        if (EsAdministradorAutorizado())
+        {
+            await CargarDatosPanelAsync();
+        }
+    }
+
+    /// <summary>
+    /// Libera la suscripción al evento reactivo de sesión al destruir el componente.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public void Dispose()
+    {
+        SesionActual.OnSesionCambiada -= ManejarCambioSesion;
+    }
+
+    /// <summary>
+    /// Reacciona ante cambios de sesión recargando los datos administrativos o limpiando el estado si se revoca el rol.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async void ManejarCambioSesion()
+    {
+        await InvokeAsync(async () =>
+        {
+            if (EsAdministradorAutorizado())
+            {
+                await CargarDatosPanelAsync();
+            }
+            else
+            {
+                LimpiarEstadoPrivado();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>
+    /// Verifica bajo política fail-closed que exista sesión vigente con rol AdministradorAccesos y permisos administrativos.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private bool EsAdministradorAutorizado()
+    {
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (!SesionActual.EstaAutenticado || sesion is null || sesion.EstaExpirada())
+        {
+            return false;
+        }
+
+        if (sesion.RolOperativo != RolUsuario.AdministradorAccesos)
+        {
+            return false;
+        }
+
+        return AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.AprobarRechazarRenovaciones)
+            && AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.GestionarPasesEvento)
+            && AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.RevocarTokens)
+            && AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.GestionarIncidencias)
+            && AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.SupervisarSincronizacionOffline);
+    }
+
+    /// <summary>
+    /// Carga todas las colecciones operativas del panel administrativo desde los servicios reales sobre SQLite.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CargarDatosPanelAsync()
+    {
+        if (!EsAdministradorAutorizado())
+        {
+            return;
+        }
+
+        _cargando = true;
+        _mensajeError = null;
+
+        try
+        {
+            _personasActivas = await AccesoConsultaService.ObtenerPersonasActivasAsync();
+            _usuarios = await GestionUsuariosService.ObtenerUsuariosAsync();
+            SincronizarRolesSeleccionadosUsuarios();
+            _renovacionesPendientes = await RenovacionService.ObtenerPendientesAsync();
+            _pasesEvento = await AccesoConsultaService.ObtenerPasesEventoAsync();
+            _tokensActivos = await AccesoConsultaService.ObtenerTokensActivosGlobalAsync();
+            _incidenciasAbiertas = await IncidenciaService.ObtenerAbiertasAsync();
+            _todasIncidencias = await IncidenciaService.ObtenerTodasAsync();
+            _resumenCola = await SyncQueueService.ObtenerResumenColaAsync();
+            _registrosPendientesSync = await SyncQueueService.ObtenerPendientesAsync(25);
+
+            await EvaluarDictamenesIaRenovacionesAsync();
+        }
+        catch (Exception)
+        {
+            _mensajeError = "No fue posible cargar la información administrativa desde SQLite.";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    /// <summary>
+    /// Evalúa de forma no bloqueante las justificaciones de renovaciones pendientes mediante el servicio de IA activo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task EvaluarDictamenesIaRenovacionesAsync()
+    {
+        HashSet<int> idsVigentes = _renovacionesPendientes.Select(r => r.Id).ToHashSet();
+        foreach (int idObsoleto in _dictamenesIaRenovacion.Keys.Where(k => !idsVigentes.Contains(k)).ToList())
+        {
+            _dictamenesIaRenovacion.Remove(idObsoleto);
+        }
+
+        foreach (SolicitudRenovacion solicitud in _renovacionesPendientes)
+        {
+            if (_dictamenesIaRenovacion.ContainsKey(solicitud.Id))
+            {
+                continue;
+            }
+
+            try
+            {
+                ClasificacionVisitaResult dictamen = await IaService.ClasificarMotivoVisitaAsync(solicitud.Justificacion);
+                _dictamenesIaRenovacion[solicitud.Id] = dictamen;
+            }
+            catch (Exception)
+            {
+                // La evaluación IA es asistiva y nunca interrumpe la revisión administrativa.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Aprueba una solicitud de renovación pendiente validando el permiso RBAC y emitiendo un nuevo token firmado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task AprobarRenovacionAsync(int solicitudId)
+    {
+        if (!ValidarPermisoAccion(PermisoSistema.AprobarRechazarRenovaciones, out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            SolicitudRenovacion aprobada = await RenovacionService.AprobarRenovacionAsync(solicitudId, sesion!.PersonaId);
+            _observacionesRenovacion.Remove(solicitudId);
+            await CargarDatosPanelAsync();
+            MostrarToast(
+                $"Solicitud #{aprobada.Id} aprobada. Nuevo token #{aprobada.TokenAccesoNuevoId} emitido correctamente.",
+                "positive");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast(ex.Message, "negative");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible aprobar la solicitud de renovación.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Rechaza una solicitud de renovación pendiente exigiendo un motivo de resolución documentado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task RechazarRenovacionAsync(int solicitudId)
+    {
+        if (!ValidarPermisoAccion(PermisoSistema.AprobarRechazarRenovaciones, out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        string motivo = ObtenerTextoDiccionario(_observacionesRenovacion, solicitudId).Trim();
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            _mensajeError = $"Debe capturar una observación o motivo para rechazar la solicitud #{solicitudId}.";
+            MostrarToast(_mensajeError, "critical");
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            SolicitudRenovacion rechazada = await RenovacionService.RechazarRenovacionAsync(
+                solicitudId,
+                sesion!.PersonaId,
+                motivo);
+
+            _observacionesRenovacion.Remove(solicitudId);
+            await CargarDatosPanelAsync();
+            MostrarToast($"Solicitud #{rechazada.Id} rechazada y registrada para auditoría.", "informative");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast(ex.Message, "negative");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible rechazar la solicitud de renovación.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Valida los campos del formulario y emite un pase por evento junto con su token QR acotado a la ventana UTC.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CrearPaseEventoAsync()
+    {
+        if (!ValidarPermisoAccion(PermisoSistema.GestionarPasesEvento, out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        if (_eventoPersonaId <= 0)
+        {
+            _mensajeError = "Seleccione una persona activa para emitir el pase por evento.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_eventoNombre))
+        {
+            _mensajeError = "El nombre del evento es obligatorio.";
+            return;
+        }
+
+        if (!IntentarConvertirLocalAUtc(_eventoInicioLocalTexto, out DateTime inicioUtc)
+            || !IntentarConvertirLocalAUtc(_eventoFinLocalTexto, out DateTime finUtc))
+        {
+            _mensajeError = "Capture fechas y horas válidas de inicio y fin para el evento.";
+            return;
+        }
+
+        if (finUtc <= inicioUtc)
+        {
+            _mensajeError = "La fecha de fin del evento debe ser posterior a la fecha de inicio.";
+            return;
+        }
+
+        if (finUtc <= DateTime.UtcNow)
+        {
+            _mensajeError = "La fecha de fin del evento debe ser posterior a la hora actual.";
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            PaseEvento paseCreado = await PaseEventoService.CrearPaseEventoAsync(
+                _eventoNombre.Trim(),
+                inicioUtc,
+                finUtc,
+                _eventoPersonaId,
+                sesion!.PersonaId,
+                string.IsNullOrWhiteSpace(_eventoDescripcion) ? null : _eventoDescripcion.Trim());
+
+            _eventoNombre = string.Empty;
+            _eventoDescripcion = string.Empty;
+            InicializarVentanaEventoPorDefecto();
+
+            await CargarDatosPanelAsync();
+            MostrarToast(
+                $"Pase de evento #{paseCreado.Id} creado con token QR #{paseCreado.TokenAccesoId}.",
+                "positive");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible emitir el pase por evento.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Emite administrativamente un nuevo token QR firmado para la persona y modalidad seleccionadas.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task EmitirTokenAsync()
+    {
+        if (!ValidarPermisoAccion(PermisoSistema.RevocarTokens, out SesionUsuario? _))
+        {
+            return;
+        }
+
+        if (_tokenPersonaId <= 0)
+        {
+            _mensajeError = "Seleccione una persona activa para emitir un nuevo token.";
+            return;
+        }
+
+        if (_tokenVigenciaHoras < 0)
+        {
+            _mensajeError = "La vigencia personalizada en horas no puede ser negativa.";
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            TimeSpan? vigencia = _tokenVigenciaHoras > 0
+                ? TimeSpan.FromHours(_tokenVigenciaHoras)
+                : null;
+
+            TokenAcceso nuevoToken = await TokenAccesoService.EmitirTokenAsync(
+                _tokenPersonaId,
+                _tokenTipoPase,
+                vigencia,
+                _tokenRevocarPrevios);
+
+            _tokenVigenciaHoras = 0;
+            await CargarDatosPanelAsync();
+            MostrarToast(
+                $"Token #{nuevoToken.Id} ({nuevoToken.TipoPase}) emitido correctamente.",
+                "positive");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible emitir el token de acceso.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Revoca un token activo exigiendo motivo obligatorio y validación del administrador operador.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task RevocarTokenAsync(int tokenId)
+    {
+        if (!ValidarPermisoAccion(PermisoSistema.RevocarTokens, out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        string motivo = ObtenerTextoDiccionario(_motivosRevocacion, tokenId).Trim();
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            _mensajeError = $"Debe ingresar un motivo obligatorio para revocar el token #{tokenId}.";
+            MostrarToast(_mensajeError, "critical");
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            bool revocado = await TokenAccesoService.RevocarTokenAsync(
+                tokenId,
+                sesion!.PersonaId,
+                motivo);
+
+            _motivosRevocacion.Remove(tokenId);
+            await CargarDatosPanelAsync();
+
+            if (revocado)
+            {
+                MostrarToast($"Token #{tokenId} revocado correctamente.", "positive");
+            }
+            else
+            {
+                MostrarToast($"El token #{tokenId} ya se encontraba revocado o no existe.", "critical");
+            }
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible revocar el token seleccionado.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Actualiza el estado operativo ITIL de una incidencia verificando identidad administrativa.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task ActualizarEstadoIncidenciaAsync(int incidenciaId, EstadoIncidencia nuevoEstado)
+    {
+        if (!ValidarPermisoAccion(PermisoSistema.GestionarIncidencias, out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            Incidencia actualizada = await IncidenciaService.ActualizarEstadoAsync(
+                incidenciaId,
+                nuevoEstado,
+                sesion!.PersonaId);
+
+            await CargarDatosPanelAsync();
+            MostrarToast(
+                $"Incidencia #{actualizada.Id} actualizada a estado '{ObtenerEtiquetaEstadoIncidencia(actualizada.Estado)}'.",
+                "positive");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible actualizar el estado de la incidencia.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Alterna la vista de incidencias entre solo abiertas/investigación e historial completo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CambiarFiltroIncidenciasAsync(bool mostrarTodas)
+    {
+        _mostrarTodasIncidencias = mostrarTodas;
+        if (mostrarTodas)
+        {
+            _todasIncidencias = await IncidenciaService.ObtenerTodasAsync();
+        }
+        else
+        {
+            _incidenciasAbiertas = await IncidenciaService.ObtenerAbiertasAsync();
+        }
+    }
+
+    /// <summary>
+    /// Carga bajo demanda la vista previa Data URI segura de una evidencia fotográfica asociada a una incidencia.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CargarEvidenciaIncidenciaAsync(int incidenciaId, string? rutaRelativa)
+    {
+        string? dataUri = await AccesoConsultaService.LeerEvidenciaFotoDataUriAsync(rutaRelativa);
+        if (string.IsNullOrWhiteSpace(dataUri))
+        {
+            MostrarToast("No fue posible cargar la vista previa local de la evidencia fotográfica.", "critical");
+            return;
+        }
+
+        _evidenciasDataUri[incidenciaId] = dataUri;
+    }
+
+    /// <summary>
+    /// Invoca la cola de sincronización offline-first y reporta el resultado detallado en ToastNotification.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task SincronizarColaAsync(bool usarSimulacionControlada)
+    {
+        if (!ValidarPermisoAccion(PermisoSistema.SupervisarSincronizacionOffline, out SesionUsuario? _))
+        {
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            Func<RegistroAcceso, CancellationToken, Task<bool>>? despachador = usarSimulacionControlada
+                ? SimularDespachoRemotoControladoAsync
+                : null;
+
+            SyncProcessResult resultado = await SyncQueueService.ProcesarColaPendienteAsync(
+                despachadorRemoto: despachador,
+                loteMaximo: 50);
+
+            _ultimoResultadoSync = resultado;
+            _resumenCola = await SyncQueueService.ObtenerResumenColaAsync();
+            _registrosPendientesSync = await SyncQueueService.ObtenerPendientesAsync(25);
+
+            string variante = resultado.SinRed
+                ? "critical"
+                : (resultado.Fallidos > 0
+                    ? "negative"
+                    : (resultado.Exitosos > 0 ? "positive" : "informative"));
+
+            MostrarToast(resultado.Mensaje, variante);
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("Error inesperado al procesar la cola de sincronización offline.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Despachador de simulación controlada que valida la integridad mínima del registro antes de confirmar su sincronización.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static Task<bool> SimularDespachoRemotoControladoAsync(RegistroAcceso registro, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        bool valido = registro.Id > 0
+            && registro.IdentificadorGlobal != Guid.Empty
+            && !string.IsNullOrWhiteSpace(registro.PuntoAcceso);
+        return Task.FromResult(valido);
+    }
+
+    /// <summary>
+    /// Valida de manera estricta la sesión activa y el permiso granular requerido antes de ejecutar una mutación administrativa.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private bool ValidarPermisoAccion(PermisoSistema permiso, out SesionUsuario? sesion)
+    {
+        sesion = SesionActual.SesionActual;
+        try
+        {
+            AutorizacionRol.ExigirPermiso(sesion, permiso);
+            return true;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast(ex.Message, "negative");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Cambia la pestaña activa dentro del panel administrativo y limpia mensajes de error previos.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void SeleccionarTab(string tab)
+    {
+        _tabActiva = tab;
+        _mensajeError = null;
+    }
+
+    /// <summary>
+    /// Valida el formulario de alta de usuario, persiste la cuenta en SQLite y recarga listados y selectores administrativos.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CrearUsuarioAsync()
+    {
+        if (!ValidarSesionAdministrativaUsuarios(out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        string nombre = _nuevoUsuarioNombre.Trim();
+        string correo = _nuevoUsuarioCorreo.Trim();
+        string? matricula = string.IsNullOrWhiteSpace(_nuevoUsuarioMatricula) ? null : _nuevoUsuarioMatricula.Trim();
+
+        if (string.IsNullOrWhiteSpace(nombre))
+        {
+            _mensajeError = "El nombre completo del usuario es obligatorio.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(correo) || !correo.Contains('@'))
+        {
+            _mensajeError = "Ingresa un correo institucional válido.";
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_nuevoUsuarioPassword) || _nuevoUsuarioPassword.Length < 8)
+        {
+            _mensajeError = "La contraseña inicial debe tener al menos 8 caracteres.";
+            return;
+        }
+
+        if (!string.Equals(_nuevoUsuarioPassword, _nuevoUsuarioConfirmarPassword, StringComparison.Ordinal))
+        {
+            _mensajeError = "La confirmación de contraseña no coincide.";
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            CrearUsuarioRequest solicitud = new()
+            {
+                NombreCompleto = nombre,
+                Correo = correo,
+                Matricula = matricula,
+                Password = _nuevoUsuarioPassword,
+                Rol = _nuevoUsuarioRol,
+                EmitirTokenInicial = _nuevoUsuarioEmitirTokenInicial,
+                TipoPaseInicial = _nuevoUsuarioTipoPaseInicial
+            };
+
+            UsuarioDetalleDto creado = await GestionUsuariosService.CrearUsuarioAsync(solicitud, sesion!.PersonaId);
+
+            _nuevoUsuarioNombre = string.Empty;
+            _nuevoUsuarioCorreo = string.Empty;
+            _nuevoUsuarioMatricula = string.Empty;
+            _nuevoUsuarioRol = RolPersona.Estudiante;
+            _nuevoUsuarioPassword = string.Empty;
+            _nuevoUsuarioConfirmarPassword = string.Empty;
+            _nuevoUsuarioEmitirTokenInicial = true;
+            _nuevoUsuarioTipoPaseInicial = TipoPase.Permanente;
+
+            await CargarDatosPanelAsync();
+
+            string sufijoPase = solicitud.EmitirTokenInicial
+                ? $" con pase QR inicial ({solicitud.TipoPaseInicial})."
+                : ".";
+
+            MostrarToast(
+                $"Usuario '{creado.NombreCompleto}' ({ObtenerEtiquetaRolPersona(creado.Rol)}) creado correctamente{sufijoPase}",
+                "positive");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast(ex.Message, "negative");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible crear el usuario solicitado.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Actualiza el rol institucional asignado a un usuario existente validando privilegios de administrador.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task ActualizarRolUsuarioAsync(int usuarioId)
+    {
+        if (!ValidarSesionAdministrativaUsuarios(out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        if (!_rolesSeleccionadosPorUsuario.TryGetValue(usuarioId, out RolPersona nuevoRol))
+        {
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            UsuarioDetalleDto actualizado = await GestionUsuariosService.ActualizarRolUsuarioAsync(
+                usuarioId,
+                nuevoRol,
+                sesion!.PersonaId);
+
+            await CargarDatosPanelAsync();
+            MostrarToast(
+                $"Rol de '{actualizado.NombreCompleto}' actualizado a {ObtenerEtiquetaRolPersona(actualizado.Rol)}.",
+                "positive");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast(ex.Message, "negative");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible actualizar el rol del usuario.", "negative");
+            SincronizarRolesSeleccionadosUsuarios();
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Activa o desactiva la cuenta de un usuario institucional impidiendo la autodesactivación del administrador autenticado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task ActualizarEstadoUsuarioAsync(int usuarioId, bool activo)
+    {
+        if (!ValidarSesionAdministrativaUsuarios(out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        if (usuarioId == sesion!.PersonaId && !activo)
+        {
+            _mensajeError = "No puedes desactivar tu propia cuenta administradora mientras operas el panel.";
+            MostrarToast(_mensajeError, "critical");
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            UsuarioDetalleDto actualizado = await GestionUsuariosService.ActualizarEstadoUsuarioAsync(
+                usuarioId,
+                activo,
+                sesion.PersonaId);
+
+            await CargarDatosPanelAsync();
+            MostrarToast(
+                actualizado.Activo
+                    ? $"Cuenta de '{actualizado.NombreCompleto}' reactivada correctamente."
+                    : $"Cuenta de '{actualizado.NombreCompleto}' desactivada correctamente.",
+                actualizado.Activo ? "positive" : "informative");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast(ex.Message, "negative");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible actualizar el estado de la cuenta.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Abre o cierra el panel inline seguro de restablecimiento de contraseña para el usuario indicado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void AlternarPanelResetContrasena(int usuarioId)
+    {
+        if (_usuarioIdResetPassword == usuarioId)
+        {
+            CerrarPanelResetContrasena();
+            return;
+        }
+
+        _usuarioIdResetPassword = usuarioId;
+        _resetPasswordNueva = string.Empty;
+        _resetPasswordConfirmacion = string.Empty;
+        _mensajeError = null;
+    }
+
+    /// <summary>
+    /// Cierra el panel inline de restablecimiento de contraseña y purga las contraseñas temporales en memoria.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void CerrarPanelResetContrasena()
+    {
+        _usuarioIdResetPassword = null;
+        _resetPasswordNueva = string.Empty;
+        _resetPasswordConfirmacion = string.Empty;
+    }
+
+    /// <summary>
+    /// Valida y aplica el restablecimiento seguro de contraseña PBKDF2-SHA256 para el usuario seleccionado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task RestablecerContrasenaUsuarioAsync(int usuarioId)
+    {
+        if (!ValidarSesionAdministrativaUsuarios(out SesionUsuario? sesion))
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_resetPasswordNueva) || _resetPasswordNueva.Length < 8)
+        {
+            _mensajeError = "La nueva contraseña debe contener al menos 8 caracteres.";
+            MostrarToast(_mensajeError, "critical");
+            return;
+        }
+
+        if (!string.Equals(_resetPasswordNueva, _resetPasswordConfirmacion, StringComparison.Ordinal))
+        {
+            _mensajeError = "La confirmación de la nueva contraseña no coincide.";
+            MostrarToast(_mensajeError, "critical");
+            return;
+        }
+
+        _procesandoAccion = true;
+        _mensajeError = null;
+
+        try
+        {
+            await GestionUsuariosService.RestablecerContrasenaAsync(
+                usuarioId,
+                _resetPasswordNueva,
+                sesion!.PersonaId);
+
+            string? nombreUsuario = _usuarios.FirstOrDefault(u => u.Id == usuarioId)?.NombreCompleto;
+            CerrarPanelResetContrasena();
+            await CargarDatosPanelAsync();
+
+            MostrarToast(
+                $"Contraseña restablecida correctamente para '{nombreUsuario ?? $"Usuario #{usuarioId}"}'.",
+                "positive");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast(ex.Message, "negative");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible restablecer la contraseña del usuario.", "negative");
+        }
+        finally
+        {
+            _procesandoAccion = false;
+        }
+    }
+
+    /// <summary>
+    /// Verifica de forma fail-closed que la sesión activa pertenezca a un Administrador de Accesos habilitado para gestionar usuarios.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private bool ValidarSesionAdministrativaUsuarios(out SesionUsuario? sesion)
+    {
+        sesion = SesionActual.SesionActual;
+        if (!EsAdministradorAutorizado() || sesion is null)
+        {
+            _mensajeError = "Se requiere una sesión vigente de Administrador de Accesos para gestionar usuarios.";
+            MostrarToast(_mensajeError, "negative");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Sincroniza el diccionario de selección de roles por fila con el estado más reciente consultado de SQLite.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void SincronizarRolesSeleccionadosUsuarios()
+    {
+        _rolesSeleccionadosPorUsuario.Clear();
+        foreach (UsuarioDetalleDto usuario in _usuarios)
+        {
+            _rolesSeleccionadosPorUsuario[usuario.Id] = usuario.Rol;
+        }
+    }
+
+    /// <summary>
+    /// Obtiene el rol actualmente seleccionado en la tabla para una fila de usuario específica.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private RolPersona ObtenerRolSeleccionadoUsuario(UsuarioDetalleDto usuario)
+    {
+        return _rolesSeleccionadosPorUsuario.TryGetValue(usuario.Id, out RolPersona rol)
+            ? rol
+            : usuario.Rol;
+    }
+
+    /// <summary>
+    /// Actualiza en memoria la selección temporal de rol para un usuario dentro de la tabla del directorio.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void ActualizarSeleccionRolUsuario(int usuarioId, string? valorRol)
+    {
+        if (Enum.TryParse<RolPersona>(valorRol, out RolPersona rolParseado))
+        {
+            _rolesSeleccionadosPorUsuario[usuarioId] = rolParseado;
+        }
+    }
+
+    /// <summary>
+    /// Filtra el directorio de usuarios por texto libre (nombre, correo o matrícula) y por rol institucional.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private IReadOnlyList<UsuarioDetalleDto> ObtenerUsuariosFiltrados()
+    {
+        IEnumerable<UsuarioDetalleDto> consulta = _usuarios;
+
+        if (!string.IsNullOrWhiteSpace(_filtroRolUsuarios)
+            && Enum.TryParse<RolPersona>(_filtroRolUsuarios, out RolPersona rolFiltro))
+        {
+            consulta = consulta.Where(u => u.Rol == rolFiltro);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_filtroUsuarios))
+        {
+            string termino = _filtroUsuarios.Trim();
+            consulta = consulta.Where(u =>
+                u.NombreCompleto.Contains(termino, StringComparison.OrdinalIgnoreCase)
+                || u.Correo.Contains(termino, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(u.Matricula)
+                    && u.Matricula.Contains(termino, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        return consulta.ToList();
+    }
+
+    /// <summary>
+    /// Restablece los filtros de búsqueda y rol aplicados al directorio de usuarios.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void LimpiarFiltrosUsuarios()
+    {
+        _filtroUsuarios = string.Empty;
+        _filtroRolUsuarios = string.Empty;
+    }
+
+    /// <summary>
+    /// Traduce un valor de RolPersona a su etiqueta institucional legible en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRolPersona(RolPersona rol) => rol switch
+    {
+        RolPersona.Estudiante => "Estudiante",
+        RolPersona.Docente => "Docente",
+        RolPersona.Administrativo => "Administrativo",
+        RolPersona.Visitante => "Visitante",
+        RolPersona.Guardia => "Guardia",
+        RolPersona.Administrador => "Administrador",
+        _ => rol.ToString()
+    };
+
+    /// <summary>
+    /// Limpia las colecciones en memoria cuando la sesión administrativa se cierra o cambia a un rol sin privilegios.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void LimpiarEstadoPrivado()
+    {
+        _personasActivas = Array.Empty<PersonaResumenDto>();
+        _usuarios = Array.Empty<UsuarioDetalleDto>();
+        _filtroUsuarios = string.Empty;
+        _filtroRolUsuarios = string.Empty;
+        _rolesSeleccionadosPorUsuario.Clear();
+        CerrarPanelResetContrasena();
+        _nuevoUsuarioNombre = string.Empty;
+        _nuevoUsuarioCorreo = string.Empty;
+        _nuevoUsuarioMatricula = string.Empty;
+        _nuevoUsuarioRol = RolPersona.Estudiante;
+        _nuevoUsuarioPassword = string.Empty;
+        _nuevoUsuarioConfirmarPassword = string.Empty;
+        _nuevoUsuarioEmitirTokenInicial = true;
+        _nuevoUsuarioTipoPaseInicial = TipoPase.Permanente;
+        _renovacionesPendientes = Array.Empty<SolicitudRenovacion>();
+        _dictamenesIaRenovacion.Clear();
+        _observacionesRenovacion.Clear();
+        _pasesEvento = Array.Empty<PaseEvento>();
+        _tokensActivos = Array.Empty<TokenAcceso>();
+        _motivosRevocacion.Clear();
+        _incidenciasAbiertas = Array.Empty<Incidencia>();
+        _todasIncidencias = Array.Empty<Incidencia>();
+        _evidenciasDataUri.Clear();
+        _resumenCola = null;
+        _registrosPendientesSync = Array.Empty<RegistroAcceso>();
+        _ultimoResultadoSync = null;
+        _mensajeError = null;
+    }
+
+    /// <summary>
+    /// Inicializa la ventana temporal predeterminada para el formulario de creación de pases por evento.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void InicializarVentanaEventoPorDefecto()
+    {
+        DateTime ahoraLocal = ObtenerHoraActualInstitucional();
+        _eventoInicioLocalTexto = ahoraLocal.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+        _eventoFinLocalTexto = ahoraLocal.AddHours(4).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Filtra la lista global de tokens activos según el texto de búsqueda ingresado por el administrador.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private IReadOnlyList<TokenAcceso> ObtenerTokensFiltrados()
+    {
+        if (string.IsNullOrWhiteSpace(_filtroTokens))
+        {
+            return _tokensActivos;
+        }
+
+        string termino = _filtroTokens.Trim();
+        return _tokensActivos
+            .Where(t =>
+                t.TipoPase.ToString().Contains(termino, StringComparison.OrdinalIgnoreCase)
+                || (t.Persona?.NombreCompleto.Contains(termino, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (t.Persona?.Correo.Contains(termino, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (t.Persona?.Matricula?.Contains(termino, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Muestra una notificación toast con la variante semántica Fiori especificada.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void MostrarToast(string mensaje, string variante)
+    {
+        _toastMensaje = mensaje;
+        _toastVariante = variante;
+    }
+
+    /// <summary>
+    /// Descarta la notificación toast actualmente visible en la interfaz.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void CerrarToast()
+    {
+        _toastMensaje = null;
+    }
+
+    /// <summary>
+    /// Obtiene de forma segura un texto capturado en un diccionario indexado por identificador numérico.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerTextoDiccionario(Dictionary<int, string> diccionario, int clave)
+    {
+        return diccionario.TryGetValue(clave, out string? valor) ? valor : string.Empty;
+    }
+
+    /// <summary>
+    /// Actualiza un valor textual en un diccionario indexado por identificador numérico.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static void ActualizarTextoDiccionario(Dictionary<int, string> diccionario, int clave, string? valor)
+    {
+        diccionario[clave] = valor ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Formatea una etiqueta legible de persona para selectores administrativos sin exponer datos sensibles.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string FormatearEtiquetaPersona(PersonaResumenDto persona)
+    {
+        string matricula = string.IsNullOrWhiteSpace(persona.Matricula) ? persona.Correo : persona.Matricula;
+        return $"{persona.NombreCompleto} ({persona.Rol} · {matricula})";
+    }
+
+    /// <summary>
+    /// Formatea la vigencia solicitada opcional en una descripción legible para revisión administrativa.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string FormatearVigencia(TimeSpan? vigencia)
+    {
+        if (!vigencia.HasValue)
+        {
+            return "Vigencia estándar";
+        }
+
+        if (vigencia.Value.TotalDays >= 1)
+        {
+            return $"{Math.Round(vigencia.Value.TotalDays, 1)} días";
+        }
+
+        return $"{Math.Round(vigencia.Value.TotalHours, 1)} horas";
+    }
+
+    /// <summary>
+    /// Resume visualmente una cadena de token firmado HMAC-SHA256 para mantener legibilidad tabular.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string AbreviarCodigo(string codigo)
+    {
+        if (string.IsNullOrWhiteSpace(codigo))
+        {
+            return "—";
+        }
+
+        return codigo.Length <= 24 ? codigo : $"{codigo[..12]}...{codigo[^8..]}";
+    }
+
+    /// <summary>
+    /// Resuelve la etiqueta de estado actual de un token asociado a un pase de evento.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEstadoTokenTexto(TokenAcceso token)
+    {
+        if (token.Revocado)
+        {
+            return "Revocado";
+        }
+
+        return token.FechaExpiracion < DateTime.UtcNow ? "Expirado" : "Vigente";
+    }
+
+    /// <summary>
+    /// Resuelve la variante semántica SAP Fiori del estado de un token.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEstadoTokenVariante(TokenAcceso token)
+    {
+        if (token.Revocado)
+        {
+            return "negative";
+        }
+
+        return token.FechaExpiracion < DateTime.UtcNow ? "critical" : "positive";
+    }
+
+    /// <summary>
+    /// Traduce la severidad ITIL 4 de una incidencia a la variante semántica de StatusBadge.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteSeveridad(SeveridadIncidencia severidad) => severidad switch
+    {
+        SeveridadIncidencia.Critica => "negative",
+        SeveridadIncidencia.Alta => "critical",
+        SeveridadIncidencia.Media => "informative",
+        _ => "neutral"
+    };
+
+    /// <summary>
+    /// Traduce el estado de una incidencia ITIL a su etiqueta legible en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaEstadoIncidencia(EstadoIncidencia estado) => estado switch
+    {
+        EstadoIncidencia.Abierta => "Abierta",
+        EstadoIncidencia.EnInvestigacion => "En investigación",
+        EstadoIncidencia.Resuelta => "Resuelta",
+        EstadoIncidencia.Cerrada => "Cerrada",
+        _ => estado.ToString()
+    };
+
+    /// <summary>
+    /// Traduce el estado de una incidencia ITIL a la variante semántica de StatusBadge.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteEstadoIncidencia(EstadoIncidencia estado) => estado switch
+    {
+        EstadoIncidencia.Abierta => "negative",
+        EstadoIncidencia.EnInvestigacion => "critical",
+        EstadoIncidencia.Resuelta => "positive",
+        EstadoIncidencia.Cerrada => "neutral",
+        _ => "neutral"
+    };
+
+    /// <summary>
+    /// Traduce el estado de sincronización offline a la variante semántica de StatusBadge.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteSync(EstadoSincronizacion estado) => estado switch
+    {
+        EstadoSincronizacion.Sincronizado => "positive",
+        EstadoSincronizacion.Error => "negative",
+        _ => "critical"
+    };
+
+    /// <summary>
+    /// Determina la clase CSS de MessageStrip correspondiente al resultado de un ciclo de sincronización.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerClaseResultadoSync(SyncProcessResult resultado)
+    {
+        if (resultado.SinRed)
+        {
+            return "sap-messagestrip--warning";
+        }
+
+        if (resultado.Fallidos > 0)
+        {
+            return "sap-messagestrip--error";
+        }
+
+        return resultado.Exitosos > 0 ? "sap-messagestrip--success" : "sap-messagestrip--information";
+    }
+
+    /// <summary>
+    /// Convierte una cadena capturada en datetime-local desde zona horaria institucional hacia UTC.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static bool IntentarConvertirLocalAUtc(string valorLocal, out DateTime fechaUtc)
+    {
+        fechaUtc = default;
+        if (string.IsNullOrWhiteSpace(valorLocal))
+        {
+            return false;
+        }
+
+        string[] formatos = { "yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss" };
+        if (!DateTime.TryParseExact(
+                valorLocal.Trim(),
+                formatos,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out DateTime localSinZona)
+            && !DateTime.TryParse(valorLocal.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.None, out localSinZona))
+        {
+            return false;
+        }
+
+        TimeZoneInfo zona = ResolverZonaHorariaInstitucional();
+        DateTime localEspecifico = DateTime.SpecifyKind(localSinZona, DateTimeKind.Unspecified);
+        fechaUtc = TimeZoneInfo.ConvertTimeToUtc(localEspecifico, zona);
+        return true;
+    }
+
+    /// <summary>
+    /// Obtiene la fecha y hora actual convertida a la zona horaria institucional UMAD.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static DateTime ObtenerHoraActualInstitucional()
+    {
+        TimeZoneInfo zona = ResolverZonaHorariaInstitucional();
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zona);
+    }
+
+    /// <summary>
+    /// Convierte una marca temporal UTC a zona horaria institucional para presentación consistente en pantalla.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string FormatearHoraLocal(DateTime fechaUtc)
+    {
+        DateTime normalizada = fechaUtc.Kind == DateTimeKind.Utc
+            ? fechaUtc
+            : (fechaUtc.Kind == DateTimeKind.Local
+                ? fechaUtc.ToUniversalTime()
+                : DateTime.SpecifyKind(fechaUtc, DateTimeKind.Utc));
+
+        TimeZoneInfo zona = ResolverZonaHorariaInstitucional();
+        return TimeZoneInfo.ConvertTimeFromUtc(normalizada, zona).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Resuelve la zona horaria institucional (America/Mexico_City) con respaldo defensivo a la zona local del sistema.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static TimeZoneInfo ResolverZonaHorariaInstitucional()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("America/Mexico_City");
+        }
+        catch (Exception)
+        {
+            return TimeZoneInfo.Local;
+        }
+    }
+}

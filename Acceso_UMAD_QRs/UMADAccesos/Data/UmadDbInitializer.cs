@@ -78,7 +78,7 @@ namespace UMADAccesos.Data
                 await ReconciliarEsquemaFase1Async(db, cancellationToken).ConfigureAwait(false);
                 await ReconciliarEsquemaFase2Async(db, cancellationToken).ConfigureAwait(false);
 
-#if DEBUG
+#if DEBUG || UMAD_DEMO_MODE
                 await SembrarDatosDesarrolloAsync(db, cancellationToken).ConfigureAwait(false);
 #else
                 _logger.LogInformation("Compilación Release detectada: la siembra de cuentas y escenarios demo está deshabilitada por política de seguridad.");
@@ -93,9 +93,9 @@ namespace UMADAccesos.Data
             }
         }
 
-#if DEBUG
+#if DEBUG || UMAD_DEMO_MODE
         /// <summary>
-        /// Siembra de manera idempotente cuentas base y un escenario normal + anómalo exclusivamente en compilaciones DEBUG para pruebas y demostración.
+        /// Siembra de manera idempotente cuentas base y un escenario normal + anómalo exclusivamente en compilaciones DEBUG o UMAD_DEMO_MODE para pruebas y demostración.
         /// </summary>
         /// <author>Emmanuel Baltazar López</author>
         /// <date>25/11/2026</date>

@@ -246,7 +246,7 @@ public sealed class SesionActualService : ISesionActualService
     }
 
     /// <summary>
-    /// Permite cambiar a una cuenta demo según rol destino únicamente con doble blindaje: bandera activa y compilación DEBUG.
+    /// Permite cambiar a una cuenta demo según rol destino únicamente con doble blindaje: bandera activa y compilación DEBUG o UMAD_DEMO_MODE.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>
     /// <date>25/11/2026</date>
@@ -265,16 +265,16 @@ public sealed class SesionActualService : ISesionActualService
             return Task.FromResult(ResultadoAutenticacion.Fallo("El modo de prueba no está habilitado en el entorno actual."));
         }
 
-#if DEBUG
+#if DEBUG || UMAD_DEMO_MODE
         return CambiarRolModoPruebaDebugAsync(rolDestino, ct);
 #else
         return Task.FromResult(ResultadoAutenticacion.Fallo("El modo de prueba está deshabilitado en compilaciones de producción."));
 #endif
     }
 
-#if DEBUG
+#if DEBUG || UMAD_DEMO_MODE
     /// <summary>
-    /// Ejecuta el cambio controlado de rol demo en compilaciones DEBUG cuando el modo de prueba fue habilitado explícitamente.
+    /// Ejecuta el cambio controlado de rol demo en compilaciones DEBUG o UMAD_DEMO_MODE cuando el modo de prueba fue habilitado explícitamente.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>
     /// <date>25/11/2026</date>

@@ -1,0 +1,1216 @@
+@page "/solicitud-pase"
+@implements IDisposable
+@inject ISesionActualService SesionActual
+@inject IAutorizacionRolService AutorizacionRol
+@inject IUmadDbInitializer DbInitializer
+@inject ITokenAccesoService TokenAccesoService
+@inject IRenovacionService RenovacionService
+@inject IAccesoConsultaService AccesoConsultaService
+@inject IIaService IaService
+
+<ToastNotification Message="@_toastMensaje" Variant="@_toastVariante" OnDismiss="CerrarToast" />
+
+@if (!SesionActual.EstaAutenticado || SesionActual.SesionActual is null)
+{
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">Autenticación requerida · Comunidad UMAD</h2>
+                <p class="fiori-page-subtitle">
+                    Inicia sesión con tu cuenta institucional para consultar tu pase QR digital, solicitar renovaciones y ver tus pases por evento.
+                </p>
+            </div>
+            <StatusBadge Text="Sin sesión" Variant="critical" />
+        </div>
+
+        <div class="sap-messagestrip sap-messagestrip--information">
+            <span>Por seguridad institucional, los pases QR firmados solo están disponibles para usuarios autenticados.</span>
+        </div>
+
+        <div class="fiori-actions-row">
+            <a href="/login" class="fiori-btn fiori-btn--emphasized">Iniciar sesión</a>
+            <a href="/" class="fiori-btn fiori-btn--standard">Volver al inicio</a>
+        </div>
+    </section>
+}
+else if (!TieneAccesoComunidad(SesionActual.SesionActual))
+{
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">Acceso restringido por control de roles (RBAC)</h2>
+                <p class="fiori-page-subtitle">
+                    Esta vista pertenece al portal de Comunidad UMAD (estudiantes, docentes, administrativos y visitantes).
+                </p>
+            </div>
+            <StatusBadge Text="RBAC Activo" Variant="negative" />
+        </div>
+
+        <div class="sap-messagestrip sap-messagestrip--warning">
+            <span>
+                Tu rol operativo actual (<strong>@ObtenerEtiquetaRol(SesionActual.SesionActual.RolOperativo)</strong>)
+                no incluye permisos de autoservicio de pases de comunidad. Utiliza los módulos asignados a tu rol.
+            </span>
+        </div>
+
+        <div class="fiori-actions-row">
+            <a href="/" class="fiori-btn fiori-btn--emphasized">Volver al panel principal</a>
+            @if (SesionActual.SesionActual.RolOperativo == RolUsuario.GuardiaSeguridad)
+            {
+                <a href="/caseta" class="fiori-btn fiori-btn--standard">Ir a Caseta de Vigilancia</a>
+            }
+            else if (SesionActual.SesionActual.RolOperativo == RolUsuario.AdministradorAccesos)
+            {
+                <a href="/admin" class="fiori-btn fiori-btn--standard">Ir a Panel de Administración</a>
+            }
+        </div>
+    </section>
+}
+else
+{
+    SesionUsuario sesion = SesionActual.SesionActual;
+
+    <div class="fiori-page-header">
+        <div>
+            <h1 class="fiori-page-title">Mi Pase QR y Solicitudes</h1>
+            <p class="fiori-page-subtitle">
+                @sesion.NombreCompleto · @sesion.Correo
+                @if (!string.IsNullOrWhiteSpace(sesion.Matricula))
+                {
+                    <span> · Matrícula: @sesion.Matricula</span>
+                }
+            </p>
+        </div>
+        <div class="fiori-actions-row">
+            <StatusBadge Text="@ObtenerEtiquetaRolInstitucional(sesion.RolInstitucional)" Variant="informative" />
+            <StatusBadge Text="@($"IA: {ObtenerEtiquetaModoIa(IaService.ModoActivo)}")" Variant="neutral" />
+            <button type="button"
+                    class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                    @onclick="CargarDatosComunidadAsync"
+                    disabled="@_cargando">
+                @(_cargando ? "Actualizando..." : "Actualizar vista")
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_mensajeError))
+    {
+        <div class="sap-messagestrip sap-messagestrip--error" role="alert">
+            <span>@_mensajeError</span>
+        </div>
+    }
+
+    <!-- Sección 1: Mi Pase QR Digital -->
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">1. Mi Pase QR Digital</h2>
+                <p class="fiori-page-subtitle">
+                    Credencial firmada criptográficamente con HMAC-SHA256 lista para validación en caseta incluso en modo offline.
+                </p>
+            </div>
+            @if (_tokenMostrado is not null)
+            {
+                <StatusBadge Text="@ObtenerTextoVigenciaToken(_tokenMostrado)" Variant="@ObtenerVarianteVigenciaToken(_tokenMostrado)" />
+            }
+            else
+            {
+                <StatusBadge Text="Sin pase activo" Variant="neutral" />
+            }
+        </div>
+
+        @if (_tokenMostrado is null)
+        {
+            <div class="fiori-empty-state">
+                <p style="margin:0 0 0.75rem 0; font-weight:600; color:var(--sapTextColor);">
+                    Aún no cuentas con un pase QR activo en este dispositivo.
+                </p>
+                <p style="margin:0 0 1rem 0; font-size:0.88rem;">
+                    Emite tu credencial digital firmada para presentarla en los puntos de control de acceso UMAD.
+                </p>
+                <button type="button"
+                        class="fiori-btn fiori-btn--emphasized"
+                        @onclick="EmitirORegenerarTokenAsync"
+                        disabled="@_emitiendoToken">
+                    @(_emitiendoToken ? "Emitiendo pase..." : "Emitir mi pase QR")
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="fiori-grid fiori-grid--2" style="align-items:center;">
+                <div style="display:flex; flex-direction:column; align-items:center; gap:0.75rem;">
+                    <div class="fiori-qr-frame">
+                        <QrCodeSvg Payload="@_tokenMostrado.CodigoFirmado"
+                                   Size="230"
+                                   AriaLabel="@($"Código QR de acceso {ObtenerEtiquetaTipoPase(_tokenMostrado.TipoPase)} de {sesion.NombreCompleto}")" />
+                        <span style="margin-top:0.55rem; font-size:0.78rem; font-weight:700; color:var(--umadNavy);">
+                            @ObtenerEtiquetaTipoPase(_tokenMostrado.TipoPase) · Folio @(_tokenMostrado.IdentificadorGlobal.ToString("N")[..8].ToUpperInvariant())
+                        </span>
+                    </div>
+
+                    @if (_tokensActivos.Count > 1)
+                    {
+                        <div class="fiori-actions-row" style="justify-content:center;">
+                            @foreach (TokenAcceso tokenItem in _tokensActivos)
+                            {
+                                bool seleccionado = tokenItem.Id == _tokenMostrado.Id;
+                                <button type="button"
+                                        class="fiori-btn fiori-btn--compact @(seleccionado ? "fiori-btn--emphasized" : "fiori-btn--standard")"
+                                        @onclick="() => SeleccionarTokenMostrado(tokenItem)">
+                                    @ObtenerEtiquetaTipoPase(tokenItem.TipoPase) #@tokenItem.Id
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div>
+                    <div class="fiori-grid fiori-grid--2" style="margin-bottom:1rem;">
+                        <div class="fiori-kpi">
+                            <span class="fiori-kpi-label">Tipo de pase</span>
+                            <span class="fiori-kpi-value" style="font-size:1.2rem;">@ObtenerEtiquetaTipoPase(_tokenMostrado.TipoPase)</span>
+                            <span class="fiori-kpi-sub">Titular: @sesion.NombreCompleto</span>
+                        </div>
+                        <div class="fiori-kpi">
+                            <span class="fiori-kpi-label">Estado de firma</span>
+                            <span class="fiori-kpi-value" style="font-size:1.2rem;">HMAC-SHA256</span>
+                            <span class="fiori-kpi-sub">Clave protegida en dispositivo</span>
+                        </div>
+                        <div class="fiori-kpi">
+                            <span class="fiori-kpi-label">Fecha de emisión</span>
+                            <span class="fiori-kpi-value" style="font-size:1.05rem;">@FormatearHoraLocal(_tokenMostrado.FechaEmision)</span>
+                            <span class="fiori-kpi-sub">Hora local (Ciudad de México)</span>
+                        </div>
+                        <div class="fiori-kpi">
+                            <span class="fiori-kpi-label">Vigencia hasta</span>
+                            <span class="fiori-kpi-value" style="font-size:1.05rem;">@FormatearHoraLocal(_tokenMostrado.FechaExpiracion)</span>
+                            <span class="fiori-kpi-sub">@ObtenerTiempoRestanteTexto(_tokenMostrado.FechaExpiracion)</span>
+                        </div>
+                    </div>
+
+                    <div class="sap-messagestrip sap-messagestrip--information" style="margin-bottom:0.85rem;">
+                        <span>
+                            Por seguridad, la cadena criptográfica no se muestra en pantalla. Para demostraciones en equipos sin cámara,
+                            puedes copiar el código firmado al portapapeles y pegarlo directamente en la vista de Caseta.
+                        </span>
+                    </div>
+
+                    <div class="fiori-actions-row">
+                        <button type="button"
+                                class="fiori-btn fiori-btn--emphasized"
+                                @onclick="() => CopiarCodigoFirmadoAsync(_tokenMostrado.CodigoFirmado)"
+                                disabled="@_copiandoCodigo">
+                            @(_copiandoCodigo ? "Copiando..." : "Copiar código para prueba en caseta")
+                        </button>
+                        <button type="button"
+                                class="fiori-btn fiori-btn--standard"
+                                @onclick="EmitirORegenerarTokenAsync"
+                                disabled="@_emitiendoToken">
+                            @(_emitiendoToken ? "Regenerando..." : "Regenerar pase QR")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </section>
+
+    <!-- Sección 2: Solicitar Renovación con Asistencia de IA -->
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">2. Solicitar Renovación con Asistencia de IA</h2>
+                <p class="fiori-page-subtitle">
+                    Describe tu motivo de renovación o cambio de modalidad y analiza su clasificación institucional antes de enviar la solicitud.
+                </p>
+            </div>
+            <StatusBadge Text="@($"Solicitudes registradas: {_misRenovaciones.Count}")" Variant="informative" />
+        </div>
+
+        <EditForm Model="_formularioRenovacion" OnValidSubmit="EnviarSolicitudRenovacionAsync">
+            <DataAnnotationsValidator />
+
+            <div class="fiori-grid fiori-grid--2">
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="tipoPaseDeseado">Tipo de pase solicitado</label>
+                    <InputSelect id="tipoPaseDeseado" class="fiori-select" @bind-Value="_formularioRenovacion.TipoPaseDeseado">
+                        <option value="@TipoPase.Permanente">Permanente (Comunidad activa · 30 días)</option>
+                        <option value="@TipoPase.Temporal">Temporal (Provisional · 7 días)</option>
+                        <option value="@TipoPase.Visitante">Visitante (Acceso por jornada · 12 horas)</option>
+                        <option value="@TipoPase.Evento">Evento (Actividad institucional · 24 horas)</option>
+                    </InputSelect>
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="vigenciaSolicitada">Vigencia solicitada (opcional)</label>
+                    <InputSelect id="vigenciaSolicitada" class="fiori-select" @bind-Value="_formularioRenovacion.VigenciaOpcion">
+                        <option value="default">Vigencia institucional por defecto</option>
+                        <option value="12h">12 horas</option>
+                        <option value="24h">24 horas</option>
+                        <option value="7d">7 días</option>
+                        <option value="30d">30 días</option>
+                        <option value="90d">90 días</option>
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="fiori-form-group">
+                <label class="fiori-label" for="justificacionRenovacion">Motivo o justificación de la solicitud</label>
+                <InputTextArea id="justificacionRenovacion"
+                               class="fiori-textarea"
+                               maxlength="500"
+                               placeholder="Ejemplo: Renovación semestral de acceso para clases en laboratorio de ingeniería y asesorías académicas..."
+                               @bind-Value="_formularioRenovacion.Justificacion" />
+                <ValidationMessage For="@(() => _formularioRenovacion.Justificacion)" />
+                <span style="font-size:0.78rem; color:var(--sapSecondaryTextColor);">
+                    @((_formularioRenovacion.Justificacion?.Length ?? 0))/500 caracteres · Los datos se guardan en SQLite local y se encolan para sincronización.
+                </span>
+            </div>
+
+            <div class="fiori-actions-row" style="margin-bottom:1rem;">
+                @if (AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.ClasificarMotivoVisitaIa))
+                {
+                    <button type="button"
+                            class="fiori-btn fiori-btn--standard"
+                            @onclick="AnalizarMotivoConIaAsync"
+                            disabled="@(_analizandoIa || string.IsNullOrWhiteSpace(_formularioRenovacion.Justificacion))">
+                        @(_analizandoIa ? "Analizando con IA..." : "Analizar motivo con IA")
+                    </button>
+                }
+
+                <button type="submit"
+                        class="fiori-btn fiori-btn--emphasized"
+                        disabled="@_enviandoRenovacion">
+                    @(_enviandoRenovacion ? "Enviando solicitud..." : "Enviar solicitud de renovación")
+                </button>
+            </div>
+        </EditForm>
+
+        @if (_resultadoIaMotivo is not null)
+        {
+            <div class="fiori-card" style="background-color:#FAFBFD; margin-bottom:1.1rem;">
+                <div class="fiori-card-header" style="margin-bottom:0.75rem; padding-bottom:0.5rem;">
+                    <div>
+                        <h3 class="fiori-card-title" style="font-size:0.96rem;">Resultado del Análisis de IA</h3>
+                        <p class="fiori-page-subtitle" style="font-size:0.82rem;">
+                            Proveedor: @_resultadoIaMotivo.ProveedorUtilizado · Modo activo: @ObtenerEtiquetaModoIa(IaService.ModoActivo)
+                        </p>
+                    </div>
+                    <div class="fiori-actions-row">
+                        <StatusBadge Text="@ObtenerEtiquetaTipoVisita(_resultadoIaMotivo.TipoVisitaSugerido)" Variant="informative" />
+                        <StatusBadge Text="@(_resultadoIaMotivo.RequiereAprobacionEspecial ? "Requiere aprobación especial" : "Flujo estándar")"
+                                     Variant="@(_resultadoIaMotivo.RequiereAprobacionEspecial ? "critical" : "positive")" />
+                    </div>
+                </div>
+
+                <div class="fiori-grid fiori-grid--3" style="margin-bottom:0.75rem;">
+                    <div class="fiori-kpi">
+                        <span class="fiori-kpi-label">Clasificación sugerida</span>
+                        <span class="fiori-kpi-value" style="font-size:1.1rem;">@ObtenerEtiquetaTipoVisita(_resultadoIaMotivo.TipoVisitaSugerido)</span>
+                    </div>
+                    <div class="fiori-kpi">
+                        <span class="fiori-kpi-label">Área destino recomendada</span>
+                        <span class="fiori-kpi-value" style="font-size:1.1rem;">@_resultadoIaMotivo.AreaDestinoSugerida</span>
+                    </div>
+                    <div class="fiori-kpi">
+                        <span class="fiori-kpi-label">Nivel de confianza</span>
+                        <span class="fiori-kpi-value" style="font-size:1.1rem;">@($"{Math.Round(_resultadoIaMotivo.NivelConfianza * 100):0}%")</span>
+                    </div>
+                </div>
+
+                <p style="margin:0 0 0.5rem 0; font-size:0.9rem;">
+                    <strong>Recomendación / dictamen:</strong> @_resultadoIaMotivo.Justificacion
+                </p>
+
+                @if (_resultadoIaMotivo.PalabrasClaveDetectadas.Count > 0)
+                {
+                    <div class="fiori-actions-row" style="margin-top:0.5rem;">
+                        <span style="font-size:0.8rem; font-weight:600; color:var(--sapSecondaryTextColor);">Palabras clave:</span>
+                        @foreach (string palabra in _resultadoIaMotivo.PalabrasClaveDetectadas)
+                        {
+                            <StatusBadge Text="@palabra" Variant="neutral" />
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <h3 class="fiori-card-title" style="font-size:0.96rem; margin-bottom:0.65rem;">Mis solicitudes de renovación</h3>
+
+        @if (_misRenovaciones.Count == 0)
+        {
+            <div class="fiori-empty-state">
+                <p style="margin:0;">Todavía no has enviado solicitudes de renovación.</p>
+            </div>
+        }
+        else
+        {
+            <div class="fiori-table-wrap">
+                <table class="fiori-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha solicitud</th>
+                            <th>Pase solicitado</th>
+                            <th>Justificación</th>
+                            <th>Estado</th>
+                            <th>Resolución</th>
+                            <th>Sync</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (SolicitudRenovacion solicitud in _misRenovaciones)
+                        {
+                            <tr>
+                                <td style="white-space:nowrap;">@FormatearHoraLocal(solicitud.FechaSolicitudUtc)</td>
+                                <td>
+                                    <strong>@ObtenerEtiquetaTipoPase(solicitud.TipoPaseDeseado)</strong>
+                                    @if (solicitud.VigenciaSolicitada.HasValue)
+                                    {
+                                        <div style="font-size:0.78rem; color:var(--sapSecondaryTextColor);">
+                                            @FormatearDuracion(solicitud.VigenciaSolicitada.Value)
+                                        </div>
+                                    }
+                                </td>
+                                <td>@solicitud.Justificacion</td>
+                                <td>
+                                    <StatusBadge Text="@ObtenerEtiquetaEstadoRenovacion(solicitud.Estado)"
+                                                 Variant="@ObtenerVarianteEstadoRenovacion(solicitud.Estado)" />
+                                </td>
+                                <td>
+                                    @if (solicitud.FechaResolucionUtc.HasValue)
+                                    {
+                                        <div>@FormatearHoraLocal(solicitud.FechaResolucionUtc.Value)</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(solicitud.MotivoResolucion))
+                                    {
+                                        <div style="font-size:0.82rem; color:var(--sapSecondaryTextColor);">@solicitud.MotivoResolucion</div>
+                                    }
+                                    else if (solicitud.Estado == EstadoRenovacion.Aprobada && solicitud.TokenAccesoNuevoId.HasValue)
+                                    {
+                                        <div style="font-size:0.82rem; color:var(--sapPositiveColor);">Nuevo pase QR emitido (#@solicitud.TokenAccesoNuevoId)</div>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size:0.82rem; color:var(--sapSecondaryTextColor);">En revisión administrativa</span>
+                                    }
+                                </td>
+                                <td>
+                                    <StatusBadge Text="@ObtenerEtiquetaSync(solicitud.EstadoSincronizacion)"
+                                                 Variant="@ObtenerVarianteSync(solicitud.EstadoSincronizacion)" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <!-- Sección 3: Mis Pases por Evento -->
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">3. Mis Pases por Evento</h2>
+                <p class="fiori-page-subtitle">
+                    Pases temporales asignados para congresos, conferencias y actividades institucionales en el campus UMAD.
+                </p>
+            </div>
+            <StatusBadge Text="@($"Eventos asignados: {_misPasesEvento.Count}")" Variant="informative" />
+        </div>
+
+        @if (_misPasesEvento.Count == 0)
+        {
+            <div class="fiori-empty-state">
+                <p style="margin:0;">No tienes pases por evento asignados actualmente.</p>
+            </div>
+        }
+        else
+        {
+            <div class="fiori-table-wrap">
+                <table class="fiori-table">
+                    <thead>
+                        <tr>
+                            <th>Evento</th>
+                            <th>Inicio vigencia</th>
+                            <th>Fin vigencia</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (PaseEvento pase in _misPasesEvento)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@pase.NombreEvento</strong>
+                                    @if (!string.IsNullOrWhiteSpace(pase.Descripcion))
+                                    {
+                                        <div style="font-size:0.82rem; color:var(--sapSecondaryTextColor);">@pase.Descripcion</div>
+                                    }
+                                </td>
+                                <td style="white-space:nowrap;">@FormatearHoraLocal(pase.FechaInicioEvento)</td>
+                                <td style="white-space:nowrap;">@FormatearHoraLocal(pase.FechaFinEvento)</td>
+                                <td>
+                                    <StatusBadge Text="@ObtenerEstadoPaseEventoTexto(pase)"
+                                                 Variant="@ObtenerEstadoPaseEventoVariante(pase)" />
+                                </td>
+                                <td>
+                                    @if (pase.TokenAcceso is not null && !pase.TokenAcceso.Revocado)
+                                    {
+                                        <div class="fiori-actions-row">
+                                            <button type="button"
+                                                    class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                                    @onclick="() => SeleccionarTokenMostrado(pase.TokenAcceso)">
+                                                Ver QR arriba
+                                            </button>
+                                            <button type="button"
+                                                    class="fiori-btn fiori-btn--transparent fiori-btn--compact"
+                                                    @onclick="() => CopiarCodigoFirmadoAsync(pase.TokenAcceso.CodigoFirmado)">
+                                                Copiar código
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size:0.82rem; color:var(--sapSecondaryTextColor);">Sin QR disponible</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    // Indica si la vista está consultando SQLite para cargar pases, renovaciones y eventos.
+    private bool _cargando;
+
+    // Indica si se está emitiendo o regenerando el pase QR digital.
+    private bool _emitiendoToken;
+
+    // Indica si se está copiando el código firmado al portapapeles.
+    private bool _copiandoCodigo;
+
+    // Indica si el motor de IA está clasificando el motivo de la solicitud.
+    private bool _analizandoIa;
+
+    // Indica si la solicitud de renovación se está persistiendo en SQLite.
+    private bool _enviandoRenovacion;
+
+    // Mensaje de error seguro mostrado en la vista.
+    private string? _mensajeError;
+
+    // Mensaje mostrado en el componente ToastNotification.
+    private string? _toastMensaje;
+
+    // Variante semántica Fiori aplicada al toast activo.
+    private string _toastVariante = "informative";
+
+    // Colección de tokens vigentes del usuario autenticado.
+    private IReadOnlyList<TokenAcceso> _tokensActivos = Array.Empty<TokenAcceso>();
+
+    // Token actualmente visualizado dentro del marco del código QR.
+    private TokenAcceso? _tokenMostrado;
+
+    // Historial de solicitudes de renovación del usuario autenticado.
+    private IReadOnlyList<SolicitudRenovacion> _misRenovaciones = Array.Empty<SolicitudRenovacion>();
+
+    // Listado de pases por evento asignados al usuario autenticado.
+    private IReadOnlyList<PaseEvento> _misPasesEvento = Array.Empty<PaseEvento>();
+
+    // Modelo enlazado al formulario de nueva solicitud de renovación.
+    private FormularioRenovacionModel _formularioRenovacion = new();
+
+    // Resultado estructurado de la clasificación asistida por IA del motivo capturado.
+    private ClasificacionVisitaResult? _resultadoIaMotivo;
+
+    /// <summary>
+    /// Inicializa la vista suscribiéndose al estado reactivo de sesión y cargando los datos de comunidad desde SQLite.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    protected override async Task OnInitializedAsync()
+    {
+        SesionActual.OnSesionCambiada += ManejarCambioSesion;
+        await CargarDatosComunidadAsync();
+    }
+
+    /// <summary>
+    /// Libera la suscripción al evento reactivo de sesión al destruir la página.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public void Dispose()
+    {
+        SesionActual.OnSesionCambiada -= ManejarCambioSesion;
+    }
+
+    /// <summary>
+    /// Recarga la vista cuando ocurre un inicio, cierre o cambio de rol de sesión en tiempo de ejecución.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async void ManejarCambioSesion()
+    {
+        await InvokeAsync(async () =>
+        {
+            _resultadoIaMotivo = null;
+            await CargarDatosComunidadAsync();
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>
+    /// Evalúa mediante IAutorizacionRolService si la sesión vigente tiene permisos de autoservicio de Comunidad UMAD.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private bool TieneAccesoComunidad(SesionUsuario sesion)
+    {
+        return AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.ConsultarPropiosPases)
+            || AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.SolicitarPaseORenovacion);
+    }
+
+    /// <summary>
+    /// Consulta en SQLite los tokens activos, renovaciones y pases por evento pertenecientes al usuario autenticado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CargarDatosComunidadAsync()
+    {
+        _cargando = true;
+        _mensajeError = null;
+
+        try
+        {
+            await DbInitializer.InitializeAsync();
+            SesionUsuario? sesion = SesionActual.SesionActual;
+            if (sesion is null || !TieneAccesoComunidad(sesion))
+            {
+                _tokensActivos = Array.Empty<TokenAcceso>();
+                _tokenMostrado = null;
+                _misRenovaciones = Array.Empty<SolicitudRenovacion>();
+                _misPasesEvento = Array.Empty<PaseEvento>();
+                return;
+            }
+
+            _tokensActivos = await TokenAccesoService.ObtenerTokensActivosPorPersonaAsync(sesion.PersonaId);
+            _misRenovaciones = await AccesoConsultaService.ObtenerRenovacionesPorPersonaAsync(sesion.PersonaId);
+            _misPasesEvento = await AccesoConsultaService.ObtenerPasesEventoAsync(sesion.PersonaId);
+
+            if (_tokenMostrado is not null)
+            {
+                TokenAcceso? coincidente = _tokensActivos.FirstOrDefault(t => t.Id == _tokenMostrado.Id);
+                _tokenMostrado = coincidente ?? _tokensActivos.FirstOrDefault();
+            }
+            else
+            {
+                _tokenMostrado = _tokensActivos.FirstOrDefault();
+            }
+        }
+        catch (Exception)
+        {
+            _mensajeError = "No fue posible consultar tus pases y solicitudes desde la base local SQLite.";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    /// <summary>
+    /// Emite un nuevo token QR firmado HMAC-SHA256 o regenera el pase vigente del usuario autenticado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task EmitirORegenerarTokenAsync()
+    {
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (sesion is null || !AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.ConsultarPropiosPases))
+        {
+            MostrarToast("No cuentas con autorización para emitir un pase QR.", "negative");
+            return;
+        }
+
+        _emitiendoToken = true;
+        _mensajeError = null;
+
+        try
+        {
+            TipoPase tipoDestino = _tokenMostrado?.TipoPase
+                ?? (sesion.RolInstitucional == RolPersona.Visitante ? TipoPase.Visitante : TipoPase.Temporal);
+
+            TokenAcceso nuevoToken = await TokenAccesoService.EmitirTokenAsync(
+                sesion.PersonaId,
+                tipoDestino,
+                vigencia: null,
+                revocarPreviosActivos: true);
+
+            await CargarDatosComunidadAsync();
+            _tokenMostrado = _tokensActivos.FirstOrDefault(t => t.Id == nuevoToken.Id) ?? nuevoToken;
+            MostrarToast("Pase QR firmado emitido correctamente y guardado en SQLite local.", "positive");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = $"No fue posible emitir el pase QR: {ex.Message}";
+            MostrarToast("Ocurrió un problema al emitir el pase QR.", "negative");
+        }
+        finally
+        {
+            _emitiendoToken = false;
+        }
+    }
+
+    /// <summary>
+    /// Cambia el token mostrado en el visor QR principal al seleccionar otro pase activo o un pase por evento.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void SeleccionarTokenMostrado(TokenAcceso token)
+    {
+        _tokenMostrado = token;
+        MostrarToast($"Mostrando pase {ObtenerEtiquetaTipoPase(token.TipoPase)} en el visor QR.", "informative");
+    }
+
+    /// <summary>
+    /// Copia el código firmado al portapapeles del dispositivo para facilitar pruebas en caseta sin cámara.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CopiarCodigoFirmadoAsync(string codigoFirmado)
+    {
+        if (string.IsNullOrWhiteSpace(codigoFirmado))
+        {
+            MostrarToast("No existe un código firmado válido para copiar.", "critical");
+            return;
+        }
+
+        _copiandoCodigo = true;
+        try
+        {
+            await Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard.Default.SetTextAsync(codigoFirmado);
+            MostrarToast("Código QR firmado copiado al portapapeles para validación en caseta.", "positive");
+        }
+        catch (Exception)
+        {
+            MostrarToast("No fue posible acceder al portapapeles en este dispositivo.", "critical");
+        }
+        finally
+        {
+            _copiandoCodigo = false;
+        }
+    }
+
+    /// <summary>
+    /// Invoca el servicio de IA para clasificar el motivo capturado en el formulario y orientar la solicitud.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task AnalizarMotivoConIaAsync()
+    {
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (sesion is null || !AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.ClasificarMotivoVisitaIa))
+        {
+            MostrarToast("Tu rol no tiene permiso para ejecutar el clasificador de motivos IA.", "negative");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_formularioRenovacion.Justificacion))
+        {
+            MostrarToast("Escribe primero el motivo de tu solicitud para analizarlo con IA.", "critical");
+            return;
+        }
+
+        _analizandoIa = true;
+        _mensajeError = null;
+
+        try
+        {
+            _resultadoIaMotivo = await IaService.ClasificarMotivoVisitaAsync(_formularioRenovacion.Justificacion);
+            MostrarToast("Análisis de motivo completado por el motor de IA.", "informative");
+        }
+        catch (Exception)
+        {
+            _mensajeError = "No fue posible ejecutar el análisis de IA en este momento; puedes enviar tu solicitud manualmente.";
+        }
+        finally
+        {
+            _analizandoIa = false;
+        }
+    }
+
+    /// <summary>
+    /// Registra la solicitud de renovación en SQLite mediante IRenovacionService y actualiza el historial del usuario.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task EnviarSolicitudRenovacionAsync()
+    {
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (sesion is null || !AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.SolicitarPaseORenovacion))
+        {
+            MostrarToast("No cuentas con autorización para registrar solicitudes de renovación.", "negative");
+            return;
+        }
+
+        _enviandoRenovacion = true;
+        _mensajeError = null;
+
+        try
+        {
+            TimeSpan? vigenciaSolicitada = ResolverVigenciaSolicitada(_formularioRenovacion.VigenciaOpcion);
+
+            await RenovacionService.SolicitarRenovacionAsync(
+                sesion.PersonaId,
+                _formularioRenovacion.TipoPaseDeseado,
+                _formularioRenovacion.Justificacion,
+                vigenciaSolicitada);
+
+            _formularioRenovacion = new FormularioRenovacionModel
+            {
+                TipoPaseDeseado = _formularioRenovacion.TipoPaseDeseado
+            };
+            _resultadoIaMotivo = null;
+
+            _misRenovaciones = await AccesoConsultaService.ObtenerRenovacionesPorPersonaAsync(sesion.PersonaId);
+            MostrarToast("Solicitud de renovación registrada en SQLite y encolada para revisión administrativa.", "positive");
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = $"No fue posible registrar la solicitud de renovación: {ex.Message}";
+            MostrarToast("Verifica los campos de la solicitud e intenta nuevamente.", "negative");
+        }
+        finally
+        {
+            _enviandoRenovacion = false;
+        }
+    }
+
+    /// <summary>
+    /// Traduce la opción de vigencia seleccionada en el formulario al valor TimeSpan correspondiente.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static TimeSpan? ResolverVigenciaSolicitada(string opcion) => opcion switch
+    {
+        "12h" => TimeSpan.FromHours(12),
+        "24h" => TimeSpan.FromHours(24),
+        "7d" => TimeSpan.FromDays(7),
+        "30d" => TimeSpan.FromDays(30),
+        "90d" => TimeSpan.FromDays(90),
+        _ => null
+    };
+
+    /// <summary>
+    /// Muestra una notificación toast con el mensaje y variante semántica Fiori indicados.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void MostrarToast(string mensaje, string variante)
+    {
+        _toastMensaje = mensaje;
+        _toastVariante = variante;
+    }
+
+    /// <summary>
+    /// Descarta la notificación toast actualmente visible en la página.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void CerrarToast()
+    {
+        _toastMensaje = null;
+    }
+
+    /// <summary>
+    /// Determina la etiqueta de vigencia mostrada en el badge principal del token QR.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerTextoVigenciaToken(TokenAcceso token)
+    {
+        DateTime ahoraUtc = DateTime.UtcNow;
+        DateTime emisionUtc = NormalizarUtc(token.FechaEmision);
+        DateTime expiracionUtc = NormalizarUtc(token.FechaExpiracion);
+
+        if (token.Revocado)
+        {
+            return "Revocado";
+        }
+
+        if (ahoraUtc < emisionUtc)
+        {
+            return "Programado";
+        }
+
+        if (expiracionUtc <= ahoraUtc)
+        {
+            return "Expirado";
+        }
+
+        return (expiracionUtc - ahoraUtc) <= TimeSpan.FromHours(24)
+            ? "Próximo a vencer"
+            : "Vigente";
+    }
+
+    /// <summary>
+    /// Resuelve la variante visual Fiori del badge de vigencia del token QR.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteVigenciaToken(TokenAcceso token)
+    {
+        DateTime ahoraUtc = DateTime.UtcNow;
+        DateTime emisionUtc = NormalizarUtc(token.FechaEmision);
+        DateTime expiracionUtc = NormalizarUtc(token.FechaExpiracion);
+
+        if (token.Revocado || expiracionUtc <= ahoraUtc)
+        {
+            return "negative";
+        }
+
+        if (ahoraUtc < emisionUtc)
+        {
+            return "informative";
+        }
+
+        return (expiracionUtc - ahoraUtc) <= TimeSpan.FromHours(24)
+            ? "critical"
+            : "positive";
+    }
+
+    /// <summary>
+    /// Calcula una descripción legible del tiempo restante de vigencia del token.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerTiempoRestanteTexto(DateTime fechaExpiracionUtc)
+    {
+        TimeSpan restante = NormalizarUtc(fechaExpiracionUtc) - DateTime.UtcNow;
+        if (restante <= TimeSpan.Zero)
+        {
+            return "Vigencia concluida";
+        }
+
+        if (restante.TotalDays >= 1)
+        {
+            return $"Restan {(int)restante.TotalDays} día(s) y {restante.Hours} h";
+        }
+
+        if (restante.TotalHours >= 1)
+        {
+            return $"Restan {(int)restante.TotalHours} h {restante.Minutes} min";
+        }
+
+        return $"Restan {Math.Max(1, restante.Minutes)} min";
+    }
+
+    /// <summary>
+    /// Determina el texto de estado de vigencia para un pase por evento.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEstadoPaseEventoTexto(PaseEvento pase)
+    {
+        if (pase.TokenAcceso?.Revocado == true)
+        {
+            return "Revocado";
+        }
+
+        DateTime ahoraUtc = DateTime.UtcNow;
+        DateTime inicioUtc = NormalizarUtc(pase.FechaInicioEvento);
+        DateTime finUtc = NormalizarUtc(pase.FechaFinEvento);
+
+        if (ahoraUtc < inicioUtc)
+        {
+            return "Programado";
+        }
+
+        if (ahoraUtc > finUtc)
+        {
+            return "Finalizado";
+        }
+
+        return "Vigente ahora";
+    }
+
+    /// <summary>
+    /// Determina la variante visual Fiori correspondiente al estado actual de un pase por evento.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEstadoPaseEventoVariante(PaseEvento pase)
+    {
+        if (pase.TokenAcceso?.Revocado == true)
+        {
+            return "negative";
+        }
+
+        DateTime ahoraUtc = DateTime.UtcNow;
+        DateTime inicioUtc = NormalizarUtc(pase.FechaInicioEvento);
+        DateTime finUtc = NormalizarUtc(pase.FechaFinEvento);
+
+        if (ahoraUtc < inicioUtc)
+        {
+            return "informative";
+        }
+
+        if (ahoraUtc > finUtc)
+        {
+            return "neutral";
+        }
+
+        return "positive";
+    }
+
+    /// <summary>
+    /// Traduce un rol operativo RBAC a su etiqueta institucional en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRol(RolUsuario rol) => rol switch
+    {
+        RolUsuario.UsuarioComunidad => "Comunidad UMAD",
+        RolUsuario.GuardiaSeguridad => "Guardia de Seguridad",
+        RolUsuario.AdministradorAccesos => "Administrador de Accesos",
+        _ => "Sin rol"
+    };
+
+    /// <summary>
+    /// Traduce un rol institucional de persona a texto legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRolInstitucional(RolPersona rol) => rol switch
+    {
+        RolPersona.Estudiante => "Estudiante UMAD",
+        RolPersona.Docente => "Docente UMAD",
+        RolPersona.Administrativo => "Personal Administrativo",
+        RolPersona.Visitante => "Visitante",
+        RolPersona.Guardia => "Guardia de Seguridad",
+        RolPersona.Administrador => "Administrador",
+        _ => rol.ToString()
+    };
+
+    /// <summary>
+    /// Traduce el tipo de pase a su nombre oficial en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaTipoPase(TipoPase tipo) => tipo switch
+    {
+        TipoPase.Permanente => "Permanente",
+        TipoPase.Temporal => "Temporal",
+        TipoPase.Visitante => "Visitante",
+        TipoPase.Evento => "Evento",
+        _ => tipo.ToString()
+    };
+
+    /// <summary>
+    /// Traduce el tipo de visita sugerido por el motor de IA a una etiqueta descriptiva.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaTipoVisita(TipoVisitaSugerido tipo) => tipo switch
+    {
+        TipoVisitaSugerido.Academico => "Académico",
+        TipoVisitaSugerido.Administrativo => "Administrativo",
+        TipoVisitaSugerido.ProveedorEntrega => "Proveedor / Entrega",
+        TipoVisitaSugerido.Evento => "Evento Institucional",
+        TipoVisitaSugerido.Mantenimiento => "Mantenimiento",
+        _ => "Otro"
+    };
+
+    /// <summary>
+    /// Traduce el modo activo del proveedor de IA a texto legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaModoIa(ModoProveedorIa modo) => modo switch
+    {
+        ModoProveedorIa.OfflineLocal => "Local Offline",
+        ModoProveedorIa.AzureAiProduction => "Azure AI Producción",
+        _ => modo.ToString()
+    };
+
+    /// <summary>
+    /// Traduce el estado de una solicitud de renovación a texto legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaEstadoRenovacion(EstadoRenovacion estado) => estado switch
+    {
+        EstadoRenovacion.Pendiente => "Pendiente",
+        EstadoRenovacion.Aprobada => "Aprobada",
+        EstadoRenovacion.Rechazada => "Rechazada",
+        _ => estado.ToString()
+    };
+
+    /// <summary>
+    /// Resuelve la variante visual Fiori para el estado de una solicitud de renovación.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteEstadoRenovacion(EstadoRenovacion estado) => estado switch
+    {
+        EstadoRenovacion.Aprobada => "positive",
+        EstadoRenovacion.Rechazada => "negative",
+        _ => "critical"
+    };
+
+    /// <summary>
+    /// Traduce el estado de sincronización offline a una etiqueta compacta.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaSync(EstadoSincronizacion estado) => estado switch
+    {
+        EstadoSincronizacion.Sincronizado => "Sincronizado",
+        EstadoSincronizacion.Error => "Error sync",
+        _ => "Pendiente sync"
+    };
+
+    /// <summary>
+    /// Resuelve la variante Fiori del badge de sincronización offline.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteSync(EstadoSincronizacion estado) => estado switch
+    {
+        EstadoSincronizacion.Sincronizado => "positive",
+        EstadoSincronizacion.Error => "negative",
+        _ => "critical"
+    };
+
+    /// <summary>
+    /// Formatea una duración solicitada en texto breve en horas o días.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string FormatearDuracion(TimeSpan duracion)
+    {
+        if (duracion.TotalDays >= 1)
+        {
+            return $"Vigencia: {(int)duracion.TotalDays} día(s)";
+        }
+
+        return $"Vigencia: {(int)duracion.TotalHours} hora(s)";
+    }
+
+    /// <summary>
+    /// Normaliza una fecha al tipo DateTimeKind.Utc para comparaciones consistentes.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static DateTime NormalizarUtc(DateTime fecha) => fecha.Kind switch
+    {
+        DateTimeKind.Utc => fecha,
+        DateTimeKind.Local => fecha.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(fecha, DateTimeKind.Utc)
+    };
+
+    /// <summary>
+    /// Convierte una fecha UTC a la zona horaria institucional America/Mexico_City para presentación local.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string FormatearHoraLocal(DateTime fechaUtc)
+    {
+        DateTime normalizada = NormalizarUtc(fechaUtc);
+        TimeZoneInfo zona;
+        try
+        {
+            zona = TimeZoneInfo.FindSystemTimeZoneById("America/Mexico_City");
+        }
+        catch (Exception)
+        {
+            zona = TimeZoneInfo.Local;
+        }
+
+        return TimeZoneInfo.ConvertTimeFromUtc(normalizada, zona).ToString("dd/MM/yyyy HH:mm");
+    }
+
+    /// <summary>
+    /// Encapsula los campos validables del formulario de solicitud de renovación de pase digital.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private sealed class FormularioRenovacionModel
+    {
+        // Modalidad de pase deseada por el usuario solicitante.
+        public TipoPase TipoPaseDeseado { get; set; } = TipoPase.Permanente;
+
+        // Clave de duración solicitada seleccionada en el desplegable.
+        public string VigenciaOpcion { get; set; } = "default";
+
+        // Justificación obligatoria del motivo de renovación o cambio de pase.
+        [Required(ErrorMessage = "La justificación de la solicitud es obligatoria.")]
+        [StringLength(500, MinimumLength = 10, ErrorMessage = "Describe tu motivo con entre 10 y 500 caracteres.")]
+        public string Justificacion { get; set; } = string.Empty;
+    }
+}

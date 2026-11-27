@@ -1,0 +1,652 @@
+@page "/login"
+@implements IDisposable
+@inject ISesionActualService SesionActual
+@inject IEntornoEjecucionService EntornoEjecucion
+@inject IUmadDbInitializer DbInitializer
+@inject IGestionUsuariosService GestionUsuariosService
+@inject NavigationManager Navigation
+
+<ToastNotification Message="@_toastMensaje" Variant="@_toastVariante" OnDismiss="CerrarToast" />
+
+<div class="fiori-login-wrap">
+    @if (_requiereSetupInicial)
+    {
+        <section class="fiori-card">
+            <div class="fiori-header">
+                <div>
+                    <h1 class="fiori-page-title">Configuración inicial — Crear Administrador Principal</h1>
+                    <p class="fiori-page-subtitle">
+                        No se detectó ninguna cuenta administradora activa en la base local SQLite.
+                        Registra el primer administrador institucional para habilitar la operación de UMAD Accesos v2.0.
+                    </p>
+                </div>
+                <StatusBadge Text="Primer arranque" Variant="critical" />
+            </div>
+
+            <div class="sap-messagestrip sap-messagestrip--information" role="status">
+                <span>
+                    Esta configuración se ejecuta una sola vez. La contraseña se protegerá localmente con hash PBKDF2-SHA256
+                    y al completar el registro iniciarás sesión automáticamente en el Panel Administrativo.
+                </span>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_mensajeError))
+            {
+                <div class="fiori-alert fiori-alert-error" role="alert">@_mensajeError</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_mensajeExito))
+            {
+                <div class="fiori-alert fiori-alert-success" role="status">@_mensajeExito</div>
+            }
+
+            <EditForm Model="_formularioSetup" OnValidSubmit="CrearAdministradorInicialAsync">
+                <DataAnnotationsValidator />
+
+                <div class="fiori-field">
+                    <label class="fiori-label" for="setup-nombre">Nombre completo</label>
+                    <InputText id="setup-nombre"
+                               class="fiori-input"
+                               autocomplete="name"
+                               placeholder="Ej. Mtro. Carlos Méndez Rivera"
+                               @bind-Value="_formularioSetup.NombreCompleto"
+                               disabled="@_procesando" />
+                    <ValidationMessage For="@(() => _formularioSetup.NombreCompleto)" />
+                </div>
+
+                <div class="fiori-field">
+                    <label class="fiori-label" for="setup-correo">Correo institucional</label>
+                    <InputText id="setup-correo"
+                               class="fiori-input"
+                               type="email"
+                               autocomplete="username"
+                               placeholder="admin@umad.edu.mx"
+                               @bind-Value="_formularioSetup.Correo"
+                               disabled="@_procesando" />
+                    <ValidationMessage For="@(() => _formularioSetup.Correo)" />
+                </div>
+
+                <div class="fiori-field">
+                    <label class="fiori-label" for="setup-matricula">Matrícula o clave de empleado (opcional)</label>
+                    <InputText id="setup-matricula"
+                               class="fiori-input"
+                               placeholder="Ej. EMP-0001 (opcional)"
+                               @bind-Value="_formularioSetup.Matricula"
+                               disabled="@_procesando" />
+                    <ValidationMessage For="@(() => _formularioSetup.Matricula)" />
+                </div>
+
+                <div class="fiori-field">
+                    <label class="fiori-label" for="setup-password">Contraseña (mínimo 8 caracteres)</label>
+                    <InputText id="setup-password"
+                               class="fiori-input"
+                               type="password"
+                               autocomplete="new-password"
+                               placeholder="Ingresa una contraseña segura"
+                               @bind-Value="_formularioSetup.Password"
+                               disabled="@_procesando" />
+                    <ValidationMessage For="@(() => _formularioSetup.Password)" />
+                </div>
+
+                <div class="fiori-field">
+                    <label class="fiori-label" for="setup-confirmar">Confirmar contraseña</label>
+                    <InputText id="setup-confirmar"
+                               class="fiori-input"
+                               type="password"
+                               autocomplete="new-password"
+                               placeholder="Repite la contraseña"
+                               @bind-Value="_formularioSetup.ConfirmarPassword"
+                               disabled="@_procesando" />
+                    <ValidationMessage For="@(() => _formularioSetup.ConfirmarPassword)" />
+                </div>
+
+                <div class="fiori-actions">
+                    <button type="submit" class="fiori-btn fiori-btn--emphasized" disabled="@_procesando">
+                        @(_procesando ? "Creando administrador..." : "Crear administrador e iniciar sesión")
+                    </button>
+                </div>
+            </EditForm>
+        </section>
+    }
+    else
+    {
+        <section class="fiori-card">
+            <div class="fiori-header">
+                <div>
+                    <h1 class="fiori-page-title">Iniciar sesión</h1>
+                    <p class="fiori-page-subtitle">
+                        Acceso autenticado a la plataforma institucional UMAD Accesos v2.0.
+                    </p>
+                </div>
+                <StatusBadge Text="@EntornoEjecucion.NombreEntorno" Variant="informative" />
+            </div>
+
+            @if (SesionActual.EstaAutenticado && SesionActual.SesionActual is SesionUsuario sesionActiva)
+            {
+                <div class="fiori-alert fiori-alert-info">
+                    Ya tienes una sesión activa como <strong>@sesionActiva.NombreCompleto</strong>
+                    (@ObtenerEtiquetaRol(sesionActiva.RolOperativo)).
+                </div>
+
+                <div class="fiori-actions">
+                    <a href="/" class="fiori-btn fiori-btn--emphasized">Ir al panel principal</a>
+                    <button type="button" class="fiori-btn fiori-btn--standard" @onclick="CerrarSesionActualAsync" disabled="@_procesando">
+                        Cerrar sesión actual
+                    </button>
+                </div>
+
+                <div class="fiori-divider"></div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_mensajeError))
+            {
+                <div class="fiori-alert fiori-alert-error" role="alert">@_mensajeError</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_mensajeExito))
+            {
+                <div class="fiori-alert fiori-alert-success" role="status">@_mensajeExito</div>
+            }
+
+            <EditForm Model="_formulario" OnValidSubmit="IniciarSesionAsync">
+                <DataAnnotationsValidator />
+
+                <div class="fiori-field">
+                    <label class="fiori-label" for="login-correo">Correo institucional</label>
+                    <InputText id="login-correo"
+                               class="fiori-input"
+                               type="email"
+                               autocomplete="username"
+                               placeholder="usuario@umad.edu.mx"
+                               @bind-Value="_formulario.Correo"
+                               disabled="@_procesando" />
+                    <ValidationMessage For="@(() => _formulario.Correo)" />
+                </div>
+
+                <div class="fiori-field">
+                    <label class="fiori-label" for="login-password">Contraseña</label>
+                    <InputText id="login-password"
+                               class="fiori-input"
+                               type="password"
+                               autocomplete="current-password"
+                               placeholder="Ingresa tu contraseña"
+                               @bind-Value="_formulario.Password"
+                               disabled="@_procesando" />
+                    <ValidationMessage For="@(() => _formulario.Password)" />
+                </div>
+
+                <div class="fiori-actions">
+                    <button type="submit" class="fiori-btn fiori-btn--emphasized" disabled="@_procesando">
+                        @(_procesando ? "Verificando credenciales..." : "Iniciar sesión")
+                    </button>
+                    <a href="/" class="fiori-btn fiori-btn--standard">Volver al inicio</a>
+                </div>
+            </EditForm>
+
+            @if (EntornoEjecucion.EsModoPruebaHabilitado)
+            {
+                <div class="fiori-demo-panel" aria-label="Acceso rápido de demostración">
+                    <h2 class="fiori-demo-panel-title">Acceso rápido de demostración (Entorno de pruebas)</h2>
+                    <p class="fiori-muted">
+                        Disponible únicamente en compilaciones de desarrollo o demostración para validar los flujos de los tres roles institucionales.
+                        En producción este bloque queda deshabilitado por doble blindaje.
+                    </p>
+
+                    <div class="fiori-demo-grid">
+                        <button type="button"
+                                class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                disabled="@_procesando"
+                                @onclick="() => IniciarModoPruebaAsync(RolUsuario.UsuarioComunidad)">
+                            Demo Estudiante
+                        </button>
+                        <button type="button"
+                                class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                disabled="@_procesando"
+                                @onclick="() => IniciarModoPruebaAsync(RolUsuario.GuardiaSeguridad)">
+                            Demo Guardia
+                        </button>
+                        <button type="button"
+                                class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                disabled="@_procesando"
+                                @onclick="() => IniciarModoPruebaAsync(RolUsuario.AdministradorAccesos)">
+                            Demo Admin
+                        </button>
+                    </div>
+
+                    @if (AutocompletadoDebugDisponible())
+                    {
+                        <div class="fiori-divider"></div>
+                        <span class="fiori-field-hint">O llenar credenciales semilla para probar verificación PBKDF2-SHA256:</span>
+                        <div class="fiori-demo-grid">
+                            <button type="button"
+                                    class="fiori-btn fiori-btn--transparent fiori-btn--compact"
+                                    disabled="@_procesando"
+                                    @onclick="() => AutocompletarCuentaDemo(RolUsuario.UsuarioComunidad)">
+                                Llenar Estudiante
+                            </button>
+                            <button type="button"
+                                    class="fiori-btn fiori-btn--transparent fiori-btn--compact"
+                                    disabled="@_procesando"
+                                    @onclick="() => AutocompletarCuentaDemo(RolUsuario.GuardiaSeguridad)">
+                                Llenar Guardia
+                            </button>
+                            <button type="button"
+                                    class="fiori-btn fiori-btn--transparent fiori-btn--compact"
+                                    disabled="@_procesando"
+                                    @onclick="() => AutocompletarCuentaDemo(RolUsuario.AdministradorAccesos)">
+                                Llenar Admin
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    // Modelo reactivo enlazado a los campos de correo y contraseña del formulario.
+    private readonly LoginFormModel _formulario = new();
+
+    // Modelo reactivo enlazado al formulario de alta del primer administrador institucional.
+    private readonly SetupAdminFormModel _formularioSetup = new();
+
+    // Indica si la base de datos requiere crear el primer administrador antes de iniciar sesión.
+    private bool _requiereSetupInicial;
+
+    // Indica si hay una operación de autenticación o inicialización en curso.
+    private bool _procesando;
+
+    // Mensaje de error seguro mostrado en la alerta del formulario.
+    private string? _mensajeError;
+
+    // Mensaje de confirmación mostrado en la alerta del formulario.
+    private string? _mensajeExito;
+
+    // Texto de notificación temporal mostrado en el ToastNotification.
+    private string? _toastMensaje;
+
+    // Variante visual SAP Fiori del toast activo.
+    private string _toastVariante = "informative";
+
+    // Indica si el componente ya fue liberado para prevenir re-renderizados tardíos.
+    private bool _liberado;
+
+    /// <summary>
+    /// Inicializa la base local SQLite, evalúa si se requiere configuración inicial y suscribe la vista a cambios del estado de sesión.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    protected override async Task OnInitializedAsync()
+    {
+        SesionActual.OnSesionCambiada += ManejarCambioSesion;
+
+        try
+        {
+            await DbInitializer.InitializeAsync();
+            _requiereSetupInicial = await GestionUsuariosService.RequiereConfiguracionInicialAsync();
+        }
+        catch (Exception)
+        {
+            _mensajeError = "No fue posible inicializar la base de datos local SQLite.";
+        }
+    }
+
+    /// <summary>
+    /// Libera la suscripción al servicio de sesión al destruir la vista.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public void Dispose()
+    {
+        _liberado = true;
+        SesionActual.OnSesionCambiada -= ManejarCambioSesion;
+    }
+
+    /// <summary>
+    /// Actualiza la vista cuando la sesión cambia desde otro componente.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async void ManejarCambioSesion()
+    {
+        if (_liberado)
+        {
+            return;
+        }
+
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Ignorado de forma segura si el componente ya fue desechado.
+        }
+    }
+
+    /// <summary>
+    /// Registra al primer administrador institucional cuando la base local carece de cuentas administrativas e inicia sesión automáticamente.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CrearAdministradorInicialAsync()
+    {
+        _procesando = true;
+        _mensajeError = null;
+        _mensajeExito = null;
+
+        try
+        {
+            await DbInitializer.InitializeAsync();
+
+            string nombre = _formularioSetup.NombreCompleto.Trim();
+            string correo = _formularioSetup.Correo.Trim().ToLowerInvariant();
+            string? matricula = string.IsNullOrWhiteSpace(_formularioSetup.Matricula)
+                ? null
+                : _formularioSetup.Matricula.Trim();
+            string password = _formularioSetup.Password;
+
+            UsuarioDetalleDto adminCreado = await GestionUsuariosService.CrearAdministradorInicialAsync(
+                nombre,
+                correo,
+                matricula,
+                password);
+
+            _requiereSetupInicial = false;
+
+            ResultadoAutenticacion resultadoSesion = await SesionActual.IniciarSesionAsync(
+                adminCreado.Correo,
+                password);
+
+            _formularioSetup.NombreCompleto = string.Empty;
+            _formularioSetup.Correo = string.Empty;
+            _formularioSetup.Matricula = null;
+            _formularioSetup.Password = string.Empty;
+            _formularioSetup.ConfirmarPassword = string.Empty;
+
+            if (!resultadoSesion.Exitoso)
+            {
+                _formulario.Correo = adminCreado.Correo;
+                _mensajeExito = "Administrador principal creado correctamente. Inicia sesión con tus nuevas credenciales.";
+                MostrarToast(_mensajeExito, "positive");
+                return;
+            }
+
+            _mensajeExito = $"¡Bienvenido, {adminCreado.NombreCompleto}! Administrador principal configurado correctamente.";
+            MostrarToast(_mensajeExito, "positive");
+            Navigation.NavigateTo("/admin");
+        }
+        catch (InvalidOperationException ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast(ex.Message, "critical");
+            _requiereSetupInicial = await GestionUsuariosService.RequiereConfiguracionInicialAsync();
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = ex.Message;
+            MostrarToast("No fue posible crear el administrador principal.", "negative");
+        }
+        finally
+        {
+            _procesando = false;
+        }
+    }
+
+    /// <summary>
+    /// Valida credenciales contra SQLite mediante PBKDF2-SHA256 y redirige al inicio en caso de éxito.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task IniciarSesionAsync()
+    {
+        _procesando = true;
+        _mensajeError = null;
+        _mensajeExito = null;
+
+        try
+        {
+            await DbInitializer.InitializeAsync();
+            ResultadoAutenticacion resultado = await SesionActual.IniciarSesionAsync(
+                _formulario.Correo,
+                _formulario.Password);
+
+            if (!resultado.Exitoso)
+            {
+                _mensajeError = resultado.Mensaje;
+                MostrarToast(resultado.Mensaje, "negative");
+                return;
+            }
+
+            _mensajeExito = resultado.Mensaje;
+            MostrarToast(resultado.Mensaje, "positive");
+            Navigation.NavigateTo("/");
+        }
+        catch (Exception)
+        {
+            _mensajeError = "Ocurrió un error al verificar las credenciales. Intenta nuevamente.";
+            MostrarToast(_mensajeError, "negative");
+        }
+        finally
+        {
+            _procesando = false;
+        }
+    }
+
+    /// <summary>
+    /// Activa una sesión controlada de demostración respetando el doble blindaje DEBUG de ISesionActualService.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task IniciarModoPruebaAsync(RolUsuario rolDestino)
+    {
+        if (!EntornoEjecucion.EsModoPruebaHabilitado)
+        {
+            _mensajeError = "El modo de prueba no está habilitado en este entorno.";
+            MostrarToast(_mensajeError, "negative");
+            return;
+        }
+
+        _procesando = true;
+        _mensajeError = null;
+        _mensajeExito = null;
+
+        try
+        {
+            await DbInitializer.InitializeAsync();
+            ResultadoAutenticacion resultado = await SesionActual.CambiarRolModoPruebaAsync(rolDestino);
+
+            if (!resultado.Exitoso)
+            {
+                _mensajeError = resultado.Mensaje;
+                MostrarToast(resultado.Mensaje, "negative");
+                return;
+            }
+
+            _mensajeExito = resultado.Mensaje;
+            MostrarToast(resultado.Mensaje, "positive");
+            Navigation.NavigateTo("/");
+        }
+        catch (Exception)
+        {
+            _mensajeError = "No fue posible iniciar la sesión de demostración.";
+            MostrarToast(_mensajeError, "negative");
+        }
+        finally
+        {
+            _procesando = false;
+        }
+    }
+
+    /// <summary>
+    /// Cierra la sesión activa actualmente desde la pantalla de inicio de sesión.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CerrarSesionActualAsync()
+    {
+        _procesando = true;
+        try
+        {
+            await SesionActual.CerrarSesionAsync();
+            _mensajeError = null;
+            _mensajeExito = "Sesión cerrada correctamente.";
+            MostrarToast("Sesión cerrada correctamente.", "informative");
+        }
+        finally
+        {
+            _procesando = false;
+        }
+    }
+
+    /// <summary>
+    /// Indica si el autocompletado de cuentas semilla está disponible en compilaciones de desarrollo o demostración controlada.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private bool AutocompletadoDebugDisponible()
+    {
+#if DEBUG || UMAD_DEMO_MODE
+        return EntornoEjecucion.EsModoPruebaHabilitado;
+#else
+        return false;
+#endif
+    }
+
+    /// <summary>
+    /// Rellena el formulario con credenciales semilla exclusivamente en compilaciones DEBUG o UMAD_DEMO_MODE para validar el flujo real PBKDF2.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void AutocompletarCuentaDemo(RolUsuario rol)
+    {
+        if (!EntornoEjecucion.EsModoPruebaHabilitado)
+        {
+            return;
+        }
+
+#if DEBUG || UMAD_DEMO_MODE
+        (_formulario.Correo, _formulario.Password) = rol switch
+        {
+            RolUsuario.AdministradorAccesos => ("admin@umad.edu.mx", "UmadAdmin#2026!"),
+            RolUsuario.GuardiaSeguridad => ("guardia@umad.edu.mx", "UmadGuardia#2026!"),
+            _ => ("estudiante@umad.edu.mx", "UmadEstudiante#2026!")
+        };
+        _mensajeError = null;
+        _mensajeExito = null;
+        MostrarToast($"Credenciales de prueba cargadas para {ObtenerEtiquetaRol(rol)}.", "informative");
+#endif
+    }
+
+    /// <summary>
+    /// Presenta una notificación toast con la variante semántica indicada.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void MostrarToast(string mensaje, string variante)
+    {
+        _toastMensaje = mensaje;
+        _toastVariante = variante;
+    }
+
+    /// <summary>
+    /// Descarta el toast activo en la pantalla de acceso.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void CerrarToast()
+    {
+        _toastMensaje = null;
+    }
+
+    /// <summary>
+    /// Traduce un rol operativo RBAC a su descripción legible en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRol(RolUsuario rol) => rol switch
+    {
+        RolUsuario.UsuarioComunidad => "Comunidad UMAD",
+        RolUsuario.GuardiaSeguridad => "Guardia de Seguridad",
+        RolUsuario.AdministradorAccesos => "Administrador de Accesos",
+        _ => "Sin rol"
+    };
+
+    /// <summary>
+    /// Encapsula los datos del formulario de autenticación con validaciones de anotación de datos.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private sealed class LoginFormModel
+    {
+        // Correo electrónico institucional del usuario que solicita iniciar sesión.
+        [Required(ErrorMessage = "El correo institucional es obligatorio.")]
+        [EmailAddress(ErrorMessage = "Ingresa un formato de correo electrónico válido.")]
+        public string Correo { get; set; } = string.Empty;
+
+        // Contraseña en memoria durante el envío del formulario para verificación PBKDF2-SHA256.
+        [Required(ErrorMessage = "La contraseña es obligatoria.")]
+        public string Password { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Encapsula los datos del formulario de configuración inicial para crear al primer administrador principal.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private sealed class SetupAdminFormModel
+    {
+        // Nombre completo del administrador principal a registrar en SQLite.
+        [Required(ErrorMessage = "El nombre completo es obligatorio.")]
+        [StringLength(150, MinimumLength = 3, ErrorMessage = "Ingresa un nombre completo de entre 3 y 150 caracteres.")]
+        public string NombreCompleto { get; set; } = string.Empty;
+
+        // Correo electrónico institucional único del administrador principal.
+        [Required(ErrorMessage = "El correo institucional es obligatorio.")]
+        [EmailAddress(ErrorMessage = "Ingresa un formato de correo electrónico válido.")]
+        public string Correo { get; set; } = string.Empty;
+
+        // Matrícula o clave de empleado opcional del administrador principal.
+        [StringLength(40, ErrorMessage = "La matrícula no puede superar los 40 caracteres.")]
+        public string? Matricula { get; set; }
+
+        // Contraseña inicial de al menos 8 caracteres para hash PBKDF2-SHA256.
+        [Required(ErrorMessage = "La contraseña es obligatoria.")]
+        [MinLength(8, ErrorMessage = "La contraseña debe tener al menos 8 caracteres.")]
+        public string Password { get; set; } = string.Empty;
+
+        // Confirmación de contraseña para prevenir errores de captura en el primer arranque.
+        [Required(ErrorMessage = "Debes confirmar la contraseña.")]
+        [Compare(nameof(Password), ErrorMessage = "Las contraseñas no coinciden.")]
+        public string ConfirmarPassword { get; set; } = string.Empty;
+    }
+}

@@ -44,7 +44,7 @@ namespace UMADAccesos
 #endif
 
             builder.Services.AddUmadCore();
-#if DEBUG
+#if DEBUG || UMAD_DEMO_MODE
             builder.Services.AddUmadAiAndAuth(configurarEntorno: opt => opt.HabilitarModoPruebaEnDebug = true);
 #else
             builder.Services.AddUmadAiAndAuth();

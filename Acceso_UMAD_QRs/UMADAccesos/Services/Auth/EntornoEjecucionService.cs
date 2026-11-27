@@ -18,8 +18,8 @@ public sealed class EntornoEjecucionService : IEntornoEjecucionService
     // Duración predeterminada aplicada cuando la configuración recibida no es positiva.
     private static readonly TimeSpan DuracionPorDefectoSesion = TimeSpan.FromHours(8);
 
-#if DEBUG
-    // Estado inmutable de la bandera de modo de prueba evaluado únicamente en compilaciones DEBUG.
+#if DEBUG || UMAD_DEMO_MODE
+    // Estado inmutable de la bandera de modo de prueba evaluado únicamente en compilaciones DEBUG o UMAD_DEMO_MODE.
     private readonly bool _banderaModoPruebaEnDebug;
 #endif
 
@@ -27,7 +27,7 @@ public sealed class EntornoEjecucionService : IEntornoEjecucionService
     private readonly TimeSpan _duracionSesion;
 
     /// <summary>
-    /// Inicializa el servicio de entorno validando la duración de sesión y aislando el modo de prueba a compilaciones DEBUG.
+    /// Inicializa el servicio de entorno validando la duración de sesión y aislando el modo de prueba a compilaciones DEBUG o UMAD_DEMO_MODE.
     /// </summary>
     /// <author>Emmanuel Baltazar López</author>
     /// <date>25/11/2026</date>
@@ -37,7 +37,7 @@ public sealed class EntornoEjecucionService : IEntornoEjecucionService
     {
         EntornoEjecucionOptions configuracion = options ?? new EntornoEjecucionOptions();
 
-#if DEBUG
+#if DEBUG || UMAD_DEMO_MODE
         _banderaModoPruebaEnDebug = configuracion.HabilitarModoPruebaEnDebug;
 #endif
 
@@ -56,6 +56,18 @@ public sealed class EntornoEjecucionService : IEntornoEjecucionService
 
     // Etiqueta descriptiva del entorno de desarrollo.
     public string NombreEntorno => "Desarrollo (DEBUG)";
+#elif UMAD_DEMO_MODE
+    // En compilación Release con UMAD_DEMO_MODE no corresponde a una compilación DEBUG.
+    public bool EsCompilacionDebug => false;
+
+    // En compilación demo controlada refleja la activación explícita de la bandera de modo de prueba.
+    public bool BanderaModoPruebaActiva => _banderaModoPruebaEnDebug;
+
+    // En compilación demo controlada habilita el modo de prueba únicamente si la bandera explícita está activa.
+    public bool EsModoPruebaHabilitado => BanderaModoPruebaActiva;
+
+    // Etiqueta descriptiva del entorno de demostración controlado.
+    public string NombreEntorno => "Demostración (UMAD_DEMO_MODE)";
 #else
     // En compilación RELEASE siempre retorna falso para impedir comportamientos de desarrollo.
     public bool EsCompilacionDebug => false;

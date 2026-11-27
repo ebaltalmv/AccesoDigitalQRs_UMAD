@@ -1,0 +1,887 @@
+@page "/accesos"
+@implements IDisposable
+@inject ISesionActualService SesionActual
+@inject IAccesoConsultaService AccesoConsultaService
+@inject IIaService IaService
+@inject IUmadDbInitializer DbInitializer
+
+<ToastNotification Message="@_toastMensaje" Variant="@_toastVariante" OnDismiss="CerrarToast" />
+
+@if (!SesionActual.EstaAutenticado || SesionActual.SesionActual is null)
+{
+    <section class="fiori-card">
+        <div class="fiori-header">
+            <div>
+                <h1 class="fiori-page-title">Historial de Accesos</h1>
+                <p class="fiori-page-subtitle">
+                    Inicia sesión para consultar los registros de entrada y salida almacenados en SQLite.
+                </p>
+            </div>
+            <StatusBadge Text="Autenticación requerida" Variant="critical" />
+        </div>
+
+        <div class="fiori-alert fiori-alert-warning">
+            El acceso al historial está protegido por control de acceso basado en roles (RBAC).
+            Inicia sesión con tu cuenta institucional para continuar.
+        </div>
+
+        <div class="fiori-actions">
+            <a href="/login" class="fiori-btn fiori-btn--emphasized">Iniciar sesión</a>
+            <a href="/" class="fiori-btn fiori-btn--standard">Volver al inicio</a>
+        </div>
+    </section>
+}
+else
+{
+    SesionUsuario sesion = SesionActual.SesionActual;
+    bool esVistaGlobal = EsRolGlobal(sesion.RolOperativo);
+    int totalMostrados = _registros.Count;
+    int totalAutorizados = _registros.Count(r => r.Resultado == ResultadoAcceso.Autorizado);
+    int totalDenegados = _registros.Count(r => r.Resultado == ResultadoAcceso.Denegado);
+    int totalPendientes = _registros.Count(r => !r.Sincronizado || r.EstadoSincronizacion != EstadoSincronizacion.Sincronizado);
+    int columnasTabla = esVistaGlobal ? 8 : 7;
+
+    <section class="fiori-card">
+        <div class="fiori-header">
+            <div>
+                <h1 class="fiori-page-title">
+                    @(esVistaGlobal ? "Historial Global de Accesos" : "Mi Historial de Accesos")
+                </h1>
+                <p class="fiori-page-subtitle">
+                    @(esVistaGlobal
+                        ? "Consulta institucional de entradas y salidas en casetas, estado de sincronización offline y análisis de anomalías IA."
+                        : $"Registros exclusivos de {sesion.NombreCompleto} ({sesion.Correo}) en zona horaria America/Mexico_City.")
+                </p>
+            </div>
+            <div class="fiori-actions">
+                <StatusBadge Text="@ObtenerEtiquetaRol(sesion.RolOperativo)" Variant="informative" />
+                <button type="button"
+                        class="fiori-btn fiori-btn--standard"
+                        disabled="@_cargando"
+                        @onclick="CargarRegistrosAsync">
+                    @(_cargando ? "Consultando..." : "Actualizar")
+                </button>
+            </div>
+        </div>
+
+        <div class="fiori-grid fiori-grid--4">
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Registros visibles</span>
+                <span class="fiori-kpi-value">@totalMostrados</span>
+            </div>
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Autorizados</span>
+                <span class="fiori-kpi-value">@totalAutorizados</span>
+            </div>
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Denegados</span>
+                <span class="fiori-kpi-value">@totalDenegados</span>
+            </div>
+            <div class="fiori-kpi">
+                <span class="fiori-kpi-label">Pendientes de sync</span>
+                <span class="fiori-kpi-value">@totalPendientes</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <h2 class="fiori-card-title">Filtros de consulta</h2>
+            <span class="fiori-field-hint">
+                Hora local institucional: America/Mexico_City · Proveedor IA: @IaService.ModoActivo
+            </span>
+        </div>
+
+        <div class="fiori-filter-bar">
+            <div class="fiori-field">
+                <label class="fiori-label" for="filtro-busqueda">
+                    @(esVistaGlobal ? "Persona, matrícula o punto de acceso" : "Punto de acceso o motivo")
+                </label>
+                <input id="filtro-busqueda"
+                       type="text"
+                       class="fiori-input"
+                       placeholder="@(esVistaGlobal ? "Ej. Caseta Principal, visitante, EST-..." : "Ej. Caseta Principal")"
+                       @bind="_textoBusqueda"
+                       @bind:event="oninput" />
+            </div>
+
+            <div class="fiori-field">
+                <label class="fiori-label" for="filtro-resultado">Resultado</label>
+                <select id="filtro-resultado" class="fiori-select" @bind="_resultadoFiltro">
+                    <option value="">Todos</option>
+                    <option value="Autorizado">Autorizado</option>
+                    <option value="Denegado">Denegado</option>
+                </select>
+            </div>
+
+            <div class="fiori-field">
+                <label class="fiori-label" for="filtro-movimiento">Tipo de movimiento</label>
+                <select id="filtro-movimiento" class="fiori-select" @bind="_movimientoFiltro">
+                    <option value="">Todos</option>
+                    <option value="Entrada">Entrada</option>
+                    <option value="Salida">Salida</option>
+                </select>
+            </div>
+
+            <div class="fiori-field">
+                <label class="fiori-label" for="filtro-sync">Sincronización</label>
+                <select id="filtro-sync" class="fiori-select" @bind="_syncFiltro">
+                    <option value="">Todos</option>
+                    <option value="Pendientes">Solo pendientes o error</option>
+                </select>
+            </div>
+
+            <div class="fiori-actions">
+                <button type="button"
+                        class="fiori-btn fiori-btn--emphasized"
+                        disabled="@_cargando"
+                        @onclick="CargarRegistrosAsync">
+                    Filtrar
+                </button>
+                <button type="button"
+                        class="fiori-btn fiori-btn--standard"
+                        disabled="@_cargando"
+                        @onclick="LimpiarFiltrosAsync">
+                    Limpiar
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_mensajeError))
+        {
+            <div class="fiori-alert fiori-alert-error" role="alert">@_mensajeError</div>
+        }
+
+        @if (_cargando)
+        {
+            <div class="fiori-empty-state">Consultando registros de acceso desde SQLite...</div>
+        }
+        else if (_registros.Count == 0)
+        {
+            <div class="fiori-empty-state">
+                No se encontraron registros de acceso que coincidan con los criterios seleccionados.
+            </div>
+        }
+        else
+        {
+            <div class="fiori-table-wrap">
+                <table class="fiori-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha local</th>
+                            @if (esVistaGlobal)
+                            {
+                                <th>Persona</th>
+                            }
+                            <th>Punto de acceso</th>
+                            <th>Movimiento</th>
+                            <th>Resultado</th>
+                            <th>Sincronización</th>
+                            <th>Anomalía IA</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (RegistroAcceso registro in _registros)
+                        {
+                            bool expandido = _registroExpandidoId == registro.Id;
+                            EvaluacionAnomaliaResult? evalResumen = ObtenerEvaluacionVisible(registro);
+
+                            <tr class="@(expandido ? "fiori-row-selected" : string.Empty)">
+                                <td>@FormatearHoraLocal(registro.FechaHora)</td>
+
+                                @if (esVistaGlobal)
+                                {
+                                    <td>
+                                        <div><strong>@(registro.Persona?.NombreCompleto ?? $"Persona #{registro.PersonaId}")</strong></div>
+                                        @if (!string.IsNullOrWhiteSpace(registro.Persona?.Matricula))
+                                        {
+                                            <div class="fiori-field-hint">@registro.Persona.Matricula</div>
+                                        }
+                                    </td>
+                                }
+
+                                <td>@registro.PuntoAcceso</td>
+
+                                <td>
+                                    <StatusBadge Text="@ObtenerEtiquetaMovimiento(registro.TipoMovimiento)"
+                                                 Variant="@(registro.TipoMovimiento == TipoMovimientoAcceso.Entrada ? "informative" : "neutral")" />
+                                </td>
+
+                                <td>
+                                    <StatusBadge Text="@ObtenerEtiquetaResultado(registro.Resultado)"
+                                                 Variant="@(registro.Resultado == ResultadoAcceso.Autorizado ? "positive" : "negative")" />
+                                </td>
+
+                                <td>
+                                    <StatusBadge Text="@ObtenerEtiquetaSincronizacion(registro.EstadoSincronizacion)"
+                                                 Variant="@ObtenerVarianteSincronizacion(registro.EstadoSincronizacion)" />
+                                </td>
+
+                                <td>
+                                    @if (evalResumen is not null)
+                                    {
+                                        <StatusBadge Text="@ObtenerEtiquetaAnomalia(evalResumen)"
+                                                     Variant="@ObtenerVarianteAnomalia(evalResumen)" />
+                                    }
+                                    else
+                                    {
+                                        <StatusBadge Text="Bajo demanda" Variant="neutral" />
+                                    }
+                                </td>
+
+                                <td>
+                                    <button type="button"
+                                            class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                            @onclick="() => AlternarDetalleAsync(registro)">
+                                        @(expandido ? "Ocultar" : "Ver detalle")
+                                    </button>
+                                </td>
+                            </tr>
+
+                            @if (expandido)
+                            {
+                                <tr>
+                                    <td colspan="@columnasTabla">
+                                        <div class="fiori-detail-panel">
+                                            <div class="fiori-detail-grid">
+                                                <div class="fiori-detail-item">
+                                                    <span class="fiori-detail-label">Registro / ID Global</span>
+                                                    <span class="fiori-detail-value fiori-mono">
+                                                        #@registro.Id · @registro.IdentificadorGlobal
+                                                    </span>
+                                                </div>
+
+                                                <div class="fiori-detail-item">
+                                                    <span class="fiori-detail-label">Motivo / Observación</span>
+                                                    <span class="fiori-detail-value">
+                                                        @(string.IsNullOrWhiteSpace(registro.MotivoResultado)
+                                                            ? "Sin observaciones registradas."
+                                                            : registro.MotivoResultado)
+                                                    </span>
+                                                </div>
+
+                                                <div class="fiori-detail-item">
+                                                    <span class="fiori-detail-label">Guardia responsable</span>
+                                                    <span class="fiori-detail-value">
+                                                        @(registro.Guardia?.NombreCompleto ?? "Sin guardia asignado")
+                                                    </span>
+                                                </div>
+
+                                                <div class="fiori-detail-item">
+                                                    <span class="fiori-detail-label">Pase / Token asociado</span>
+                                                    <span class="fiori-detail-value">
+                                                        @(registro.TokenAcceso is not null
+                                                            ? $"{registro.TokenAcceso.TipoPase} (Expira {FormatearHoraLocal(registro.TokenAcceso.FechaExpiracion)})"
+                                                            : "Sin token vinculado")
+                                                    </span>
+                                                </div>
+
+                                                @if (registro.EntradaRelacionada is not null)
+                                                {
+                                                    <div class="fiori-detail-item">
+                                                        <span class="fiori-detail-label">Entrada vinculada</span>
+                                                        <span class="fiori-detail-value">
+                                                            #@registro.EntradaRelacionada.Id · @FormatearHoraLocal(registro.EntradaRelacionada.FechaHora) (@registro.EntradaRelacionada.PuntoAcceso)
+                                                        </span>
+                                                    </div>
+                                                }
+
+                                                <div class="fiori-detail-item">
+                                                    <span class="fiori-detail-label">Detalle de sincronización</span>
+                                                    <span class="fiori-detail-value">
+                                                        Estado: @ObtenerEtiquetaSincronizacion(registro.EstadoSincronizacion)
+                                                        · Reintentos: @registro.Reintentos
+                                                        @if (registro.FechaUltimoIntento.HasValue)
+                                                        {
+                                                            <span> · Último intento: @FormatearHoraLocal(registro.FechaUltimoIntento.Value)</span>
+                                                        }
+                                                    </span>
+                                                    @if (!string.IsNullOrWhiteSpace(registro.UltimoError))
+                                                    {
+                                                        <span class="fiori-field-hint">Error: @registro.UltimoError</span>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            @if (!string.IsNullOrWhiteSpace(registro.RutaEvidenciaFoto))
+                                            {
+                                                <div class="fiori-divider"></div>
+                                                <div class="fiori-detail-item">
+                                                    <span class="fiori-detail-label">Evidencia fotográfica local</span>
+
+                                                    @if (_cargandoDetalle)
+                                                    {
+                                                        <span class="fiori-field-hint">Cargando evidencia segura desde AppDataDirectory...</span>
+                                                    }
+                                                    else if (_evidenciasDataUri.TryGetValue(registro.Id, out string? dataUri) && !string.IsNullOrWhiteSpace(dataUri))
+                                                    {
+                                                        <img src="@dataUri"
+                                                             alt="Evidencia fotográfica del registro #@registro.Id"
+                                                             class="fiori-evidence-preview" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="fiori-field-hint">
+                                                            Archivo de evidencia registrado (@registro.RutaEvidenciaFoto), pero no disponible localmente en este dispositivo.
+                                                        </span>
+                                                    }
+
+                                                    @if (!string.IsNullOrWhiteSpace(registro.HashEvidenciaFoto))
+                                                    {
+                                                        <span class="fiori-field-hint fiori-mono">
+                                                            SHA-256: @registro.HashEvidenciaFoto
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
+
+                                            <div class="fiori-divider"></div>
+                                            @if (_cargandoDetalle && !_evaluacionesPorRegistro.ContainsKey(registro.Id))
+                                            {
+                                                <span class="fiori-field-hint">Ejecutando análisis de anomalías IA...</span>
+                                            }
+                                            else if (_evaluacionesPorRegistro.TryGetValue(registro.Id, out EvaluacionAnomaliaResult? evalDetalle))
+                                            {
+                                                <div class="fiori-anomaly-box @ObtenerClaseCajaAnomalia(evalDetalle)">
+                                                    <div class="fiori-actions-row">
+                                                        <strong>Evaluación de Anomalías IA</strong>
+                                                        <StatusBadge Text="@ObtenerEtiquetaAnomalia(evalDetalle)"
+                                                                     Variant="@ObtenerVarianteAnomalia(evalDetalle)" />
+                                                        <span class="fiori-field-hint">
+                                                            Proveedor: @evalDetalle.ProveedorUtilizado
+                                                            @(evalDetalle.DegradadoPorFallo ? " (contingencia)" : string.Empty)
+                                                        </span>
+                                                    </div>
+
+                                                    <p class="fiori-muted">@evalDetalle.RecomendacionGuardia</p>
+
+                                                    @if (evalDetalle.ReglasActivadas.Count > 0)
+                                                    {
+                                                        <div class="fiori-detail-item">
+                                                            <span class="fiori-detail-label">Reglas y hallazgos detectados</span>
+                                                            <ul>
+                                                                @foreach (string regla in evalDetalle.ReglasActivadas)
+                                                                {
+                                                                    <li>@regla</li>
+                                                                }
+                                                            </ul>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    // Colección de registros de acceso filtrados y mostrados en la tabla actual.
+    private IReadOnlyList<RegistroAcceso> _registros = Array.Empty<RegistroAcceso>();
+
+    // Caché de evaluación de anomalías por persona para badges rápidos en la tabla.
+    private readonly Dictionary<int, EvaluacionAnomaliaResult> _evaluacionesPorPersona = new();
+
+    // Caché de evaluación de anomalías detallada por identificador de registro expandido.
+    private readonly Dictionary<int, EvaluacionAnomaliaResult> _evaluacionesPorRegistro = new();
+
+    // Caché de vistas previas seguras en Data URI para evidencias fotográficas locales.
+    private readonly Dictionary<int, string?> _evidenciasDataUri = new();
+
+    // Texto de búsqueda por persona, matrícula, correo, punto de acceso o motivo.
+    private string _textoBusqueda = string.Empty;
+
+    // Filtro seleccionado para el resultado del intento de acceso.
+    private string _resultadoFiltro = string.Empty;
+
+    // Filtro seleccionado para la dirección del movimiento (Entrada o Salida).
+    private string _movimientoFiltro = string.Empty;
+
+    // Filtro seleccionado para el estado de sincronización offline.
+    private string _syncFiltro = string.Empty;
+
+    // Identificador del registro actualmente expandido en el panel de detalle.
+    private int? _registroExpandidoId;
+
+    // Indica si la tabla principal se encuentra consultando SQLite.
+    private bool _cargando;
+
+    // Indica si el panel de detalle está cargando evidencia fotográfica o evaluación IA.
+    private bool _cargandoDetalle;
+
+    // Mensaje de error seguro visible para el usuario.
+    private string? _mensajeError;
+
+    // Mensaje temporal del componente ToastNotification.
+    private string? _toastMensaje;
+
+    // Variante visual SAP Fiori del toast activo.
+    private string _toastVariante = "informative";
+
+    // Bandera para evitar operaciones UI tras liberar el componente.
+    private bool _liberado;
+
+    /// <summary>
+    /// Suscribe la vista al estado de sesión, asegura la inicialización de SQLite y carga el historial inicial.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    protected override async Task OnInitializedAsync()
+    {
+        SesionActual.OnSesionCambiada += ManejarCambioSesion;
+        await CargarRegistrosAsync();
+    }
+
+    /// <summary>
+    /// Libera la suscripción al evento reactivo de sesión al destruir la página.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public void Dispose()
+    {
+        _liberado = true;
+        SesionActual.OnSesionCambiada -= ManejarCambioSesion;
+    }
+
+    /// <summary>
+    /// Recarga el historial con el alcance RBAC actualizado cuando cambia el usuario o rol activo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async void ManejarCambioSesion()
+    {
+        if (_liberado)
+        {
+            return;
+        }
+
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                _registroExpandidoId = null;
+                await CargarRegistrosAsync();
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Ignorado de forma segura si la vista ya fue cerrada.
+        }
+    }
+
+    /// <summary>
+    /// Consulta en SQLite los registros de acceso aplicando el filtro RBAC por rol y los criterios de búsqueda activos.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CargarRegistrosAsync()
+    {
+        _mensajeError = null;
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (sesion is null)
+        {
+            _registros = Array.Empty<RegistroAcceso>();
+            _evaluacionesPorPersona.Clear();
+            _evaluacionesPorRegistro.Clear();
+            _evidenciasDataUri.Clear();
+            return;
+        }
+
+        _cargando = true;
+        try
+        {
+            await DbInitializer.InitializeAsync();
+
+            int? personaIdFiltro = sesion.RolOperativo == RolUsuario.UsuarioComunidad
+                ? sesion.PersonaId
+                : null;
+
+            ResultadoAcceso? resultadoFiltro = _resultadoFiltro switch
+            {
+                "Autorizado" => ResultadoAcceso.Autorizado,
+                "Denegado" => ResultadoAcceso.Denegado,
+                _ => null
+            };
+
+            bool? soloPendientesSync = _syncFiltro == "Pendientes" ? true : null;
+
+            IReadOnlyList<RegistroAcceso> consulta = await AccesoConsultaService.ObtenerRegistrosAccesoAsync(
+                personaIdFiltro: personaIdFiltro,
+                resultadoFiltro: resultadoFiltro,
+                soloPendientesSync: soloPendientesSync,
+                textoBusqueda: string.IsNullOrWhiteSpace(_textoBusqueda) ? null : _textoBusqueda.Trim(),
+                limite: 200);
+
+            TipoMovimientoAcceso? movimientoFiltro = _movimientoFiltro switch
+            {
+                "Entrada" => TipoMovimientoAcceso.Entrada,
+                "Salida" => TipoMovimientoAcceso.Salida,
+                _ => null
+            };
+
+            _registros = movimientoFiltro.HasValue
+                ? consulta.Where(r => r.TipoMovimiento == movimientoFiltro.Value).ToList()
+                : consulta;
+
+            _evaluacionesPorPersona.Clear();
+
+            if (EsRolGlobal(sesion.RolOperativo) && IaService.ModoActivo == ModoProveedorIa.OfflineLocal)
+            {
+                await PrecargarIndicadoresAnomaliaAsync(_registros);
+            }
+        }
+        catch (Exception)
+        {
+            _mensajeError = "No fue posible consultar el historial de accesos en SQLite.";
+            MostrarToast(_mensajeError, "negative");
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    /// <summary>
+    /// Precarga indicadores no bloqueantes de anomalía IA por persona visible cuando opera el proveedor local offline.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task PrecargarIndicadoresAnomaliaAsync(IReadOnlyList<RegistroAcceso> registros)
+    {
+        IEnumerable<RegistroAcceso> muestraPorPersona = registros
+            .GroupBy(r => r.PersonaId)
+            .Select(g => g.First())
+            .Take(20);
+
+        foreach (RegistroAcceso ultimo in muestraPorPersona)
+        {
+            EvaluacionAnomaliaResult evaluacion = await IaService.EvaluarAnomaliaAccesoAsync(
+                ConstruirContextoEvaluacion(ultimo));
+
+            _evaluacionesPorPersona[ultimo.PersonaId] = evaluacion;
+        }
+    }
+
+    /// <summary>
+    /// Restablece los criterios de filtrado a sus valores predeterminados y recarga el historial.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task LimpiarFiltrosAsync()
+    {
+        _textoBusqueda = string.Empty;
+        _resultadoFiltro = string.Empty;
+        _movimientoFiltro = string.Empty;
+        _syncFiltro = string.Empty;
+        _registroExpandidoId = null;
+
+        await CargarRegistrosAsync();
+        MostrarToast("Filtros restablecidos.", "informative");
+    }
+
+    /// <summary>
+    /// Expande o contrae el panel forense de un registro cargando su evidencia fotográfica segura y evaluación IA.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task AlternarDetalleAsync(RegistroAcceso registro)
+    {
+        if (_registroExpandidoId == registro.Id)
+        {
+            _registroExpandidoId = null;
+            return;
+        }
+
+        _registroExpandidoId = registro.Id;
+        _cargandoDetalle = true;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(registro.RutaEvidenciaFoto) && !_evidenciasDataUri.ContainsKey(registro.Id))
+            {
+                string? dataUri = await AccesoConsultaService.LeerEvidenciaFotoDataUriAsync(registro.RutaEvidenciaFoto);
+                _evidenciasDataUri[registro.Id] = dataUri;
+            }
+
+            if (!_evaluacionesPorRegistro.ContainsKey(registro.Id))
+            {
+                EvaluacionAnomaliaResult evaluacion = await IaService.EvaluarAnomaliaAccesoAsync(
+                    ConstruirContextoEvaluacion(registro));
+                _evaluacionesPorRegistro[registro.Id] = evaluacion;
+            }
+        }
+        catch (Exception)
+        {
+            MostrarToast("Se cargó el detalle parcial del registro; no fue posible completar los datos complementarios.", "critical");
+        }
+        finally
+        {
+            _cargandoDetalle = false;
+        }
+    }
+
+    /// <summary>
+    /// Construye el contexto estructurado para evaluar anomalías de un registro de acceso específico.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static ContextoEvaluacionAcceso ConstruirContextoEvaluacion(RegistroAcceso registro)
+    {
+        return new ContextoEvaluacionAcceso
+        {
+            PersonaId = registro.PersonaId,
+            PuntoAcceso = registro.PuntoAcceso,
+            TipoMovimiento = registro.TipoMovimiento,
+            FechaHoraEventoUtc = registro.FechaHora,
+            TokenAccesoId = registro.TokenAccesoId,
+            TokenValido = registro.Resultado == ResultadoAcceso.Autorizado,
+            MotivoValidacionToken = registro.MotivoResultado,
+            RegistroAccesoActualId = registro.Id
+        };
+    }
+
+    /// <summary>
+    /// Resuelve la evaluación de anomalías más precisa disponible en caché para mostrar en la fila de la tabla.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private EvaluacionAnomaliaResult? ObtenerEvaluacionVisible(RegistroAcceso registro)
+    {
+        if (_evaluacionesPorRegistro.TryGetValue(registro.Id, out EvaluacionAnomaliaResult? porRegistro))
+        {
+            return porRegistro;
+        }
+
+        return _evaluacionesPorPersona.TryGetValue(registro.PersonaId, out EvaluacionAnomaliaResult? porPersona)
+            ? porPersona
+            : null;
+    }
+
+    /// <summary>
+    /// Determina si el rol operativo cuenta con vista global de accesos institucionales.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static bool EsRolGlobal(RolUsuario rol) =>
+        rol == RolUsuario.GuardiaSeguridad || rol == RolUsuario.AdministradorAccesos;
+
+    /// <summary>
+    /// Presenta un mensaje temporal mediante ToastNotification.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void MostrarToast(string mensaje, string variante)
+    {
+        _toastMensaje = mensaje;
+        _toastVariante = variante;
+    }
+
+    /// <summary>
+    /// Limpia el toast activo cuando el usuario lo descarta.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void CerrarToast()
+    {
+        _toastMensaje = null;
+    }
+
+    /// <summary>
+    /// Traduce un rol operativo RBAC a su etiqueta legible en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRol(RolUsuario rol) => rol switch
+    {
+        RolUsuario.UsuarioComunidad => "Comunidad UMAD",
+        RolUsuario.GuardiaSeguridad => "Guardia de Seguridad",
+        RolUsuario.AdministradorAccesos => "Administrador de Accesos",
+        _ => "Sin rol"
+    };
+
+    /// <summary>
+    /// Convierte el tipo de movimiento a su etiqueta visible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaMovimiento(TipoMovimientoAcceso tipo) => tipo switch
+    {
+        TipoMovimientoAcceso.Entrada => "Entrada",
+        TipoMovimientoAcceso.Salida => "Salida",
+        _ => "Movimiento"
+    };
+
+    /// <summary>
+    /// Convierte el resultado de acceso a su etiqueta legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaResultado(ResultadoAcceso resultado) => resultado switch
+    {
+        ResultadoAcceso.Autorizado => "Autorizado",
+        ResultadoAcceso.Denegado => "Denegado",
+        _ => "Desconocido"
+    };
+
+    /// <summary>
+    /// Traduce el estado de sincronización offline a su texto descriptivo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaSincronizacion(EstadoSincronizacion estado) => estado switch
+    {
+        EstadoSincronizacion.Sincronizado => "Sincronizado",
+        EstadoSincronizacion.Pendiente => "Pendiente sync",
+        EstadoSincronizacion.Error => "Error sync",
+        _ => "Pendiente"
+    };
+
+    /// <summary>
+    /// Determina la variante semántica SAP Fiori correspondiente al estado de sincronización.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteSincronizacion(EstadoSincronizacion estado) => estado switch
+    {
+        EstadoSincronizacion.Sincronizado => "positive",
+        EstadoSincronizacion.Pendiente => "critical",
+        EstadoSincronizacion.Error => "negative",
+        _ => "neutral"
+    };
+
+    /// <summary>
+    /// Genera una etiqueta concisa para la evaluación de anomalías IA.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaAnomalia(EvaluacionAnomaliaResult evaluacion)
+    {
+        if (!evaluacion.EsAnomalo)
+        {
+            return "Normal";
+        }
+
+        return evaluacion.NivelRiesgo switch
+        {
+            NivelRiesgoAnomalia.Alto => "Anomalía Alta",
+            NivelRiesgoAnomalia.Medio => "Riesgo Medio",
+            _ => "Alerta Baja"
+        };
+    }
+
+    /// <summary>
+    /// Determina la variante semántica SAP Fiori del badge de anomalía IA.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteAnomalia(EvaluacionAnomaliaResult evaluacion)
+    {
+        if (!evaluacion.EsAnomalo)
+        {
+            return "positive";
+        }
+
+        return evaluacion.NivelRiesgo switch
+        {
+            NivelRiesgoAnomalia.Alto => "negative",
+            NivelRiesgoAnomalia.Medio => "critical",
+            _ => "informative"
+        };
+    }
+
+    /// <summary>
+    /// Devuelve la clase visual del contenedor de anomalía según el nivel de riesgo dictaminado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerClaseCajaAnomalia(EvaluacionAnomaliaResult evaluacion)
+    {
+        if (!evaluacion.EsAnomalo)
+        {
+            return "fiori-anomaly-box--low";
+        }
+
+        return evaluacion.NivelRiesgo switch
+        {
+            NivelRiesgoAnomalia.Alto => "fiori-anomaly-box--high",
+            NivelRiesgoAnomalia.Medio => "fiori-anomaly-box--medium",
+            _ => "fiori-anomaly-box--low"
+        };
+    }
+
+    /// <summary>
+    /// Convierte una marca temporal UTC a hora local institucional de America/Mexico_City con respaldo determinista a UTC-6.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string FormatearHoraLocal(DateTime fechaUtc)
+    {
+        DateTime normalizada = fechaUtc.Kind == DateTimeKind.Utc
+            ? fechaUtc
+            : (fechaUtc.Kind == DateTimeKind.Local
+                ? fechaUtc.ToUniversalTime()
+                : DateTime.SpecifyKind(fechaUtc, DateTimeKind.Utc));
+
+        TimeZoneInfo zona;
+        try
+        {
+            zona = TimeZoneInfo.FindSystemTimeZoneById("America/Mexico_City");
+        }
+        catch (Exception)
+        {
+            zona = TimeZoneInfo.CreateCustomTimeZone("UMAD-UTC-6", TimeSpan.FromHours(-6), "UTC-6", "UTC-6");
+        }
+
+        return TimeZoneInfo.ConvertTimeFromUtc(normalizada, zona).ToString("dd/MM/yyyy HH:mm");
+    }
+}

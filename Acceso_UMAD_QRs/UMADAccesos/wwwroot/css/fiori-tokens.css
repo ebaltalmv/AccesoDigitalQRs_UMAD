@@ -915,3 +915,361 @@ a {
         max-width: none;
     }
 }
+
+/* ==========================================================================
+   Extensiones aditivas Fase 4: navegación superior, formularios, alertas,
+   paneles de detalle, login y compatibilidad de vistas SAP Fiori
+   ========================================================================== */
+
+.fiori-grid:not(.fiori-grid--2):not(.fiori-grid--3):not(.fiori-grid--4) {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.fiori-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--sapBorderColor);
+}
+
+.fiori-section-title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--umadNavyDark);
+    line-height: 1.25;
+}
+
+.fiori-muted {
+    margin: 0.25rem 0 0;
+    font-size: 0.88rem;
+    color: var(--sapSecondaryTextColor);
+}
+
+.fiori-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+
+.fiori-header .fiori-actions {
+    margin-top: 0;
+}
+
+/* Navegación horizontal integrada en Shell Bar */
+.fiori-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.fiori-nav-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.38rem 0.75rem;
+    border-radius: var(--sapElementRadius);
+    color: rgba(255, 255, 255, 0.88);
+    text-decoration: none;
+    font-size: 0.86rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.fiori-nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+    color: #FFFFFF;
+}
+
+.fiori-nav-item.active {
+    background-color: rgba(201, 151, 0, 0.22);
+    border-color: rgba(201, 151, 0, 0.8);
+    color: #FFE799;
+}
+
+/* Aliases de botones semánticos Fiori */
+.fiori-btn-primary {
+    background-color: var(--sapBrandColor);
+    border-color: var(--sapBrandColor);
+    color: #FFFFFF;
+}
+
+.fiori-btn-primary:hover:not(:disabled) {
+    background-color: var(--umadNavyDark);
+    border-color: var(--umadNavyDark);
+}
+
+.fiori-btn-secondary {
+    background-color: #FFFFFF;
+    border-color: var(--sapBorderColor);
+    color: var(--sapBrandColor);
+}
+
+.fiori-btn-secondary:hover:not(:disabled) {
+    background-color: #EEF3F8;
+    border-color: var(--sapBrandColor);
+}
+
+.fiori-btn-positive {
+    background-color: var(--sapPositiveColor);
+    border-color: var(--sapPositiveColor);
+    color: #FFFFFF;
+}
+
+.fiori-btn-positive:hover:not(:disabled) {
+    background-color: #126C12;
+}
+
+.fiori-btn-negative,
+.fiori-btn-danger {
+    background-color: var(--sapNegativeColor);
+    border-color: var(--sapNegativeColor);
+    color: #FFFFFF;
+}
+
+.fiori-btn-negative:hover:not(:disabled),
+.fiori-btn-danger:hover:not(:disabled) {
+    background-color: #960000;
+}
+
+.fiori-btn-shell {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.32);
+    color: #FFFFFF;
+}
+
+.fiori-btn-shell:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.24);
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+/* Campos y filtros de formulario */
+.fiori-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+
+.fiori-field-hint {
+    font-size: 0.78rem;
+    color: var(--sapSecondaryTextColor);
+}
+
+.fiori-filter-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+    margin-bottom: 1rem;
+    padding: 0.9rem;
+    background-color: #F8FAFC;
+    border: 1px solid var(--sapBorderColor);
+    border-radius: var(--sapElementRadius);
+}
+
+.fiori-filter-bar .fiori-field {
+    margin-bottom: 0;
+}
+
+/* Alertas semánticas tipo MessageStrip */
+.fiori-alert {
+    padding: 0.85rem 1rem;
+    border-radius: var(--sapElementRadius);
+    border: 1px solid var(--sapBorderColor);
+    border-left-width: 4px;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    background-color: var(--sapInformativeBackground);
+    border-left-color: var(--sapInformativeColor);
+    color: #003F8A;
+}
+
+.fiori-alert-error {
+    background-color: var(--sapNegativeBackground);
+    border-color: rgba(187, 0, 0, 0.35);
+    border-left-color: var(--sapNegativeColor);
+    color: #780000;
+}
+
+.fiori-alert-success {
+    background-color: var(--sapPositiveBackground);
+    border-color: rgba(24, 137, 24, 0.35);
+    border-left-color: var(--sapPositiveColor);
+    color: #0F520F;
+}
+
+.fiori-alert-warning {
+    background-color: var(--sapCriticalBackground);
+    border-color: rgba(185, 80, 0, 0.38);
+    border-left-color: var(--sapCriticalColor);
+    color: #6E3000;
+}
+
+.fiori-alert-info {
+    background-color: var(--sapInformativeBackground);
+    border-color: rgba(0, 100, 217, 0.35);
+    border-left-color: var(--sapInformativeColor);
+    color: #003F8A;
+}
+
+/* Tabs, caja QR y badges adicionales */
+.fiori-tab.active {
+    color: var(--sapBrandColor);
+    border-bottom-color: var(--sapBrandColor);
+}
+
+.fiori-qr-box {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    padding: 1.15rem;
+    background-color: #FFFFFF;
+    border: 2px solid var(--umadNavy);
+    border-radius: var(--sapCardRadius);
+    box-shadow: var(--sapShadowLevel1);
+}
+
+.fiori-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.62rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    line-height: 1.25;
+    border: 1px solid var(--sapBorderColor);
+    background-color: #EEF1F4;
+    color: var(--sapSecondaryTextColor);
+    white-space: nowrap;
+}
+
+/* Login y sección de demostración controlada */
+.fiori-login-wrap {
+    max-width: 520px;
+    margin: 1rem auto;
+}
+
+.fiori-demo-panel {
+    margin-top: 1.25rem;
+    padding: 1rem;
+    border-radius: var(--sapCardRadius);
+    background-color: var(--umadGoldSoft);
+    border: 1px solid rgba(201, 151, 0, 0.6);
+    border-left: 4px solid var(--umadGold);
+}
+
+.fiori-demo-panel-title {
+    margin: 0 0 0.35rem;
+    font-size: 0.94rem;
+    font-weight: 700;
+    color: #6B4E00;
+}
+
+.fiori-demo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+/* Panel expandible de detalle e inspección IA/evidencia */
+.fiori-detail-panel {
+    margin-top: 0.5rem;
+    padding: 1rem;
+    background-color: #F8FAFC;
+    border: 1px solid var(--sapBorderColor);
+    border-left: 4px solid var(--umadNavy);
+    border-radius: var(--sapElementRadius);
+}
+
+.fiori-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.fiori-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.fiori-detail-label {
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--sapSecondaryTextColor);
+}
+
+.fiori-detail-value {
+    font-size: 0.9rem;
+    color: var(--sapTextColor);
+    word-break: break-word;
+}
+
+.fiori-anomaly-box {
+    margin-top: 0.85rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--sapElementRadius);
+    border: 1px solid var(--sapBorderColor);
+    border-left-width: 4px;
+    background-color: #FFFFFF;
+}
+
+.fiori-anomaly-box--high {
+    background-color: var(--sapNegativeBackground);
+    border-color: rgba(187, 0, 0, 0.35);
+    border-left-color: var(--sapNegativeColor);
+}
+
+.fiori-anomaly-box--medium {
+    background-color: var(--sapCriticalBackground);
+    border-color: rgba(185, 80, 0, 0.38);
+    border-left-color: var(--sapCriticalColor);
+}
+
+.fiori-anomaly-box--low {
+    background-color: var(--sapPositiveBackground);
+    border-color: rgba(24, 137, 24, 0.35);
+    border-left-color: var(--sapPositiveColor);
+}
+
+.fiori-table tbody tr.fiori-row-selected {
+    background-color: var(--sapInformativeBackground);
+}
+
+.fiori-divider {
+    height: 1px;
+    background-color: var(--sapBorderColor);
+    margin: 0.9rem 0;
+}
+
+@media (max-width: 960px) {
+    .fiori-nav {
+        display: none;
+    }
+}
+
+@media (max-width: 860px) {
+    .fiori-shellbar {
+        padding: 0.5rem 0.85rem;
+    }
+
+    .fiori-user-pill {
+        display: none;
+    }
+}

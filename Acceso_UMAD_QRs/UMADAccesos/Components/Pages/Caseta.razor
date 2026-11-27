@@ -1,0 +1,1532 @@
+@page "/caseta"
+@implements IDisposable
+@inject ISesionActualService SesionActual
+@inject IAutorizacionRolService AutorizacionRol
+@inject IUmadDbInitializer DbInitializer
+@inject IQrScannerService QrScannerService
+@inject IEvidenciaFotoService EvidenciaFotoService
+@inject ITokenAccesoService TokenAccesoService
+@inject IRegistroAccesoService RegistroAccesoService
+@inject IIncidenciaService IncidenciaService
+@inject IAccesoConsultaService AccesoConsultaService
+@inject IIaService IaService
+@inject ISyncQueueService SyncQueueService
+
+<ToastNotification Message="@_toastMensaje" Variant="@_toastVariante" OnDismiss="CerrarToast" />
+
+@if (!SesionActual.EstaAutenticado || SesionActual.SesionActual is null)
+{
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">Autenticación requerida · Caseta de Vigilancia</h2>
+                <p class="fiori-page-subtitle">
+                    Inicia sesión con una cuenta de Guardia de Seguridad o Administrador de Accesos para operar la caseta.
+                </p>
+            </div>
+            <StatusBadge Text="Sin sesión" Variant="critical" />
+        </div>
+
+        <div class="sap-messagestrip sap-messagestrip--information">
+            <span>El registro de entradas, salidas, captura de evidencia e incidencias requiere trazabilidad del operador autenticado.</span>
+        </div>
+
+        <div class="fiori-actions-row">
+            <a href="/login" class="fiori-btn fiori-btn--emphasized">Iniciar sesión</a>
+            <a href="/" class="fiori-btn fiori-btn--standard">Volver al inicio</a>
+        </div>
+    </section>
+}
+else if (!TieneAccesoCaseta(SesionActual.SesionActual))
+{
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">Acceso restringido por control de roles (RBAC)</h2>
+                <p class="fiori-page-subtitle">
+                    La operación de Caseta de Vigilancia está reservada exclusivamente para Guardia de Seguridad y Administrador de Accesos.
+                </p>
+            </div>
+            <StatusBadge Text="Acceso Denegado (RBAC)" Variant="negative" />
+        </div>
+
+        <div class="sap-messagestrip sap-messagestrip--error">
+            <span>
+                Tu sesión actual corresponde al rol <strong>@ObtenerEtiquetaRol(SesionActual.SesionActual.RolOperativo)</strong>,
+                el cual no dispone de permisos para escanear códigos QR de terceros ni registrar movimientos de caseta.
+            </span>
+        </div>
+
+        <div class="fiori-actions-row">
+            <a href="/" class="fiori-btn fiori-btn--emphasized">Volver al inicio</a>
+            <a href="/solicitud-pase" class="fiori-btn fiori-btn--standard">Ir a Mi Pase QR</a>
+        </div>
+    </section>
+}
+else
+{
+    SesionUsuario sesion = SesionActual.SesionActual;
+
+    <div class="fiori-page-header">
+        <div>
+            <h1 class="fiori-page-title">Caseta de Vigilancia y Control de Acceso</h1>
+            <p class="fiori-page-subtitle">
+                Operador en turno: @sesion.NombreCompleto (@ObtenerEtiquetaRol(sesion.RolOperativo)) · Punto activo: @_puntoAcceso
+            </p>
+        </div>
+        <div class="fiori-actions-row">
+            <StatusBadge Text="@($"IA: {ObtenerEtiquetaModoIa(IaService.ModoActivo)}")" Variant="informative" />
+            <StatusBadge Text="@($"Pendientes sync: {(_resumenCola?.TotalPendientesOperativos ?? 0)}")"
+                         Variant="@((_resumenCola?.TotalPendientesOperativos ?? 0) > 0 ? "critical" : "positive")" />
+            <button type="button"
+                    class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                    @onclick="CargarEstadoOperativoAsync"
+                    disabled="@_cargandoEstado">
+                @(_cargandoEstado ? "Actualizando..." : "Actualizar estado")
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_mensajeErrorGeneral))
+    {
+        <div class="sap-messagestrip sap-messagestrip--error" role="alert">
+            <span>@_mensajeErrorGeneral</span>
+        </div>
+    }
+
+    <!-- Sección 1: Escáner QR Nativo y Control de Acceso -->
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">1. Escáner QR Nativo y Validación de Acceso</h2>
+                <p class="fiori-page-subtitle">
+                    Valida firma HMAC-SHA256, vigencia, revocación, persiste el movimiento offline en SQLite y ejecuta evaluación de anomalías con IA.
+                </p>
+            </div>
+            <StatusBadge Text="@(_tipoMovimiento == TipoMovimientoAcceso.Entrada ? "Modo Entrada" : "Modo Salida")"
+                         Variant="@(_tipoMovimiento == TipoMovimientoAcceso.Entrada ? "positive" : "informative")" />
+        </div>
+
+        <div class="fiori-grid fiori-grid--2">
+            <div class="fiori-form-group">
+                <label class="fiori-label" for="puntoAccesoCaseta">Punto de acceso (caseta)</label>
+                <select id="puntoAccesoCaseta" class="fiori-select" @bind="_puntoAcceso">
+                    @foreach (string punto in PuntosAccesoDisponibles)
+                    {
+                        <option value="@punto">@punto</option>
+                    }
+                </select>
+            </div>
+
+            <div class="fiori-form-group">
+                <label class="fiori-label" for="tipoMovimientoCaseta">Tipo de movimiento</label>
+                <select id="tipoMovimientoCaseta" class="fiori-select" @bind="_tipoMovimiento">
+                    <option value="@TipoMovimientoAcceso.Entrada">Entrada al campus</option>
+                    <option value="@TipoMovimientoAcceso.Salida">Salida del campus</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="fiori-actions-row" style="margin-bottom:1rem;">
+            <button type="button"
+                    class="fiori-btn fiori-btn--emphasized"
+                    @onclick="EscanearQrConCamaraAsync"
+                    disabled="@(_escaneandoQr || _validandoAcceso)">
+                @(_escaneandoQr ? "Abriendo escáner ZXing..." : "Escanear QR con cámara (ZXing)")
+            </button>
+
+            <button type="button"
+                    class="fiori-btn fiori-btn--standard"
+                    @onclick="PegarCodigoDesdePortapapelesAsync"
+                    disabled="@(_escaneandoQr || _validandoAcceso)">
+                Pegar desde portapapeles
+            </button>
+
+            @if (_evidenciaActual is not null)
+            {
+                <StatusBadge Text="Foto de evidencia lista para adjuntar" Variant="positive" />
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_avisoEscaner))
+        {
+            <div class="sap-messagestrip sap-messagestrip--warning" role="status">
+                <span>@_avisoEscaner</span>
+            </div>
+        }
+
+        <div class="fiori-form-group">
+            <label class="fiori-label" for="codigoQrManual">Pegar código QR firmado (prueba sin cámara)</label>
+            <textarea id="codigoQrManual"
+                      class="fiori-textarea fiori-mono"
+                      style="min-height:74px;"
+                      placeholder="Pega aquí la cadena firmada copiada desde Mi Pase QR o capturada por el escáner..."
+                      @bind="_codigoQrInput"
+                      @bind:event="oninput"></textarea>
+        </div>
+
+        <div class="fiori-actions-row">
+            <button type="button"
+                    class="fiori-btn fiori-btn--positive"
+                    @onclick="ValidarYRegistrarAccesoAsync"
+                    disabled="@(_validandoAcceso || string.IsNullOrWhiteSpace(_codigoQrInput))">
+                @(_validandoAcceso ? "Validando y registrando..." : "Validar y Registrar Acceso")
+            </button>
+
+            <button type="button"
+                    class="fiori-btn fiori-btn--standard"
+                    @onclick="LimpiarValidacionActual"
+                    disabled="@_validandoAcceso">
+                Limpiar
+            </button>
+        </div>
+
+        @if (_resultadoOperacion is not null)
+        {
+            <div class="fiori-card" style="@ObtenerEstiloTarjetaResultado(_resultadoOperacion.Autorizado)">
+                <div class="fiori-card-header" style="margin-bottom:0.8rem; padding-bottom:0.6rem;">
+                    <div>
+                        <h3 class="fiori-card-title" style="@ObtenerEstiloTituloResultado(_resultadoOperacion.Autorizado)">
+                            Resultado en vivo · @(_resultadoOperacion.Autorizado ? "Acceso Autorizado" : "Acceso Denegado")
+                        </h3>
+                        <p class="fiori-page-subtitle">
+                            @_resultadoOperacion.PuntoAcceso · @FormatearHoraLocal(_resultadoOperacion.FechaHoraUtc)
+                        </p>
+                    </div>
+                    <div class="fiori-actions-row">
+                        <StatusBadge Text="@(_resultadoOperacion.Autorizado ? "Autorizado" : "Denegado")"
+                                     Variant="@(_resultadoOperacion.Autorizado ? "positive" : "negative")" />
+                        <StatusBadge Text="@(_resultadoOperacion.TipoMovimiento == TipoMovimientoAcceso.Entrada ? "Entrada" : "Salida")"
+                                     Variant="informative" />
+                        <StatusBadge Text="@_resultadoOperacion.EstadoSyncTexto"
+                                     Variant="@_resultadoOperacion.EstadoSyncVariante" />
+                    </div>
+                </div>
+
+                <div class="fiori-grid fiori-grid--3" style="margin-bottom:0.85rem;">
+                    <div class="fiori-kpi">
+                        <span class="fiori-kpi-label">Titular</span>
+                        <span class="fiori-kpi-value" style="font-size:1.05rem;">@_resultadoOperacion.NombrePersona</span>
+                        @if (!string.IsNullOrWhiteSpace(_resultadoOperacion.MatriculaPersona))
+                        {
+                            <span class="fiori-kpi-sub">Matrícula: @_resultadoOperacion.MatriculaPersona</span>
+                        }
+                    </div>
+                    <div class="fiori-kpi">
+                        <span class="fiori-kpi-label">Rol y tipo de pase</span>
+                        <span class="fiori-kpi-value" style="font-size:1.05rem;">@_resultadoOperacion.RolPersonaTexto</span>
+                        <span class="fiori-kpi-sub">@_resultadoOperacion.TipoPaseTexto</span>
+                    </div>
+                    <div class="fiori-kpi">
+                        <span class="fiori-kpi-label">Trazabilidad local</span>
+                        <span class="fiori-kpi-value" style="font-size:1.05rem;">
+                            @(_resultadoOperacion.RegistroAccesoId.HasValue ? $"Registro #{_resultadoOperacion.RegistroAccesoId.Value}" : "Sin registro en tabla")
+                        </span>
+                        <span class="fiori-kpi-sub">
+                            @(_resultadoOperacion.EntradaRelacionadaId.HasValue
+                                ? $"Vinculado a entrada #{_resultadoOperacion.EntradaRelacionadaId.Value}"
+                                : (_resultadoOperacion.TieneEvidenciaAdjunta ? "Con evidencia fotográfica" : "Sin evidencia adjunta"))
+                        </span>
+                    </div>
+                </div>
+
+                <p style="margin:0 0 0.85rem 0; font-size:0.92rem;">
+                    <strong>Motivo de validación:</strong> @_resultadoOperacion.Motivo
+                </p>
+
+                @if (_resultadoOperacion.EvaluacionAnomalia is not null)
+                {
+                    EvaluacionAnomaliaResult ia = _resultadoOperacion.EvaluacionAnomalia;
+                    <div class="fiori-card" style="margin-bottom:0; background-color:#FFFFFF;">
+                        <div class="fiori-card-header" style="margin-bottom:0.65rem; padding-bottom:0.5rem;">
+                            <div>
+                                <h4 class="fiori-card-title" style="font-size:0.95rem;">Dictamen de Análisis de Anomalías IA</h4>
+                                <p class="fiori-page-subtitle" style="font-size:0.8rem;">
+                                    Motor: @ia.ProveedorUtilizado @(ia.DegradadoPorFallo ? " · Operación degradada no bloqueante" : string.Empty)
+                                </p>
+                            </div>
+                            <div class="fiori-actions-row">
+                                <StatusBadge Text="@($"Riesgo {ObtenerEtiquetaRiesgo(ia.NivelRiesgo)}")"
+                                             Variant="@ObtenerVarianteRiesgo(ia.NivelRiesgo)" />
+                                @if (ia.EsAnomalo)
+                                {
+                                    <StatusBadge Text="Anomalía detectada" Variant="critical" />
+                                }
+                            </div>
+                        </div>
+
+                        <p style="margin:0 0 0.5rem 0; font-size:0.9rem;">
+                            <strong>Recomendación al guardia:</strong> @ia.RecomendacionGuardia
+                        </p>
+
+                        @if (ia.ReglasActivadas.Count > 0)
+                        {
+                            <div style="margin-top:0.5rem;">
+                                <strong style="font-size:0.84rem;">Hallazgos y reglas activadas:</strong>
+                                <ul style="margin:0.35rem 0 0 1.2rem; padding:0; font-size:0.86rem;">
+                                    @foreach (string regla in ia.ReglasActivadas)
+                                    {
+                                        <li>@regla</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+
+                        @if (_resultadoOperacion.SugerirIncidencia || !_resultadoOperacion.Autorizado)
+                        {
+                            <div class="fiori-actions-row" style="margin-top:0.75rem;">
+                                <button type="button"
+                                        class="fiori-btn fiori-btn--standard fiori-btn--compact"
+                                        @onclick="PrellenarIncidenciaDesdeResultado">
+                                    Prellenar incidencia ITIL con este resultado
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <!-- Sección 2: Evidencia Fotográfica del Dispositivo -->
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">2. Evidencia Fotográfica del Dispositivo</h2>
+                <p class="fiori-page-subtitle">
+                    Captura una fotografía con MediaPicker y cálculo automático de hash SHA-256 para vincularla a una entrada o incidencia.
+                </p>
+            </div>
+            <StatusBadge Text="@(_evidenciaActual is not null ? "Evidencia capturada" : "Sin evidencia activa")"
+                         Variant="@(_evidenciaActual is not null ? "positive" : "neutral")" />
+        </div>
+
+        <div class="fiori-actions-row" style="margin-bottom:0.85rem;">
+            <button type="button"
+                    class="fiori-btn fiori-btn--emphasized"
+                    @onclick="CapturarFotoEvidenciaAsync"
+                    disabled="@_capturandoFoto">
+                @(_capturandoFoto ? "Capturando fotografía..." : "Capturar foto de evidencia")
+            </button>
+
+            @if (_evidenciaActual is not null)
+            {
+                <button type="button"
+                        class="fiori-btn fiori-btn--standard"
+                        @onclick="LimpiarEvidenciaActual">
+                    Descartar evidencia
+                </button>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_avisoFoto))
+        {
+            <div class="sap-messagestrip sap-messagestrip--warning" role="status">
+                <span>@_avisoFoto</span>
+            </div>
+        }
+
+        @if (_evidenciaActual is not null)
+        {
+            <div class="fiori-grid fiori-grid--2" style="align-items:start;">
+                <div>
+                    @if (!string.IsNullOrWhiteSpace(_evidenciaPreviewDataUri))
+                    {
+                        <img src="@_evidenciaPreviewDataUri"
+                             alt="Previsualización de evidencia fotográfica capturada en caseta"
+                             class="fiori-evidence-preview" />
+                    }
+                    else
+                    {
+                        <div class="fiori-empty-state">
+                            <p style="margin:0;">Imagen almacenada en dispositivo sin vista previa disponible.</p>
+                        </div>
+                    }
+                </div>
+
+                <div>
+                    <div class="fiori-kpi" style="margin-bottom:0.75rem;">
+                        <span class="fiori-kpi-label">Ruta local relativa</span>
+                        <span class="fiori-mono" style="font-weight:600;">@_evidenciaActual.RutaRelativa</span>
+                    </div>
+                    <div class="fiori-kpi" style="margin-bottom:0.75rem;">
+                        <span class="fiori-kpi-label">Integridad SHA-256</span>
+                        <span class="fiori-mono" style="font-size:0.78rem;">@ResumirHash(_evidenciaActual.HashSha256)</span>
+                        <span class="fiori-kpi-sub">Se asociará automáticamente al próximo registro de entrada o incidencia.</span>
+                    </div>
+                </div>
+            </div>
+        }
+    </section>
+
+    <!-- Sección 3: Reportar Incidencia de Caseta (ITIL) -->
+    <section class="fiori-card">
+        <div class="fiori-card-header">
+            <div>
+                <h2 class="fiori-card-title">3. Reportar Incidencia de Caseta (ITIL)</h2>
+                <p class="fiori-page-subtitle">
+                    Documenta incidentes de seguridad u operación en caseta con severidad ITIL 4, evidencia y trazabilidad offline.
+                </p>
+            </div>
+            <StatusBadge Text="@($"Incidencias abiertas: {_incidenciasAbiertas.Count}")"
+                         Variant="@(_incidenciasAbiertas.Count > 0 ? "critical" : "positive")" />
+        </div>
+
+        <EditForm Model="_formularioIncidencia" OnValidSubmit="ReportarIncidenciaAsync">
+            <DataAnnotationsValidator />
+
+            <div class="fiori-grid fiori-grid--3">
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="tituloIncidencia">Título de la incidencia</label>
+                    <InputText id="tituloIncidencia"
+                               class="fiori-input"
+                               maxlength="200"
+                               placeholder="Ej. Intento de acceso con QR revocado"
+                               @bind-Value="_formularioIncidencia.Titulo" />
+                    <ValidationMessage For="@(() => _formularioIncidencia.Titulo)" />
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="severidadIncidencia">Severidad ITIL</label>
+                    <InputSelect id="severidadIncidencia" class="fiori-select" @bind-Value="_formularioIncidencia.Severidad">
+                        <option value="@SeveridadIncidencia.Baja">Baja · Menor</option>
+                        <option value="@SeveridadIncidencia.Media">Media · Seguimiento</option>
+                        <option value="@SeveridadIncidencia.Alta">Alta · Prioritaria</option>
+                        <option value="@SeveridadIncidencia.Critica">Crítica · Escalamiento inmediato</option>
+                    </InputSelect>
+                </div>
+
+                <div class="fiori-form-group">
+                    <label class="fiori-label" for="puntoIncidencia">Punto de acceso</label>
+                    <InputSelect id="puntoIncidencia" class="fiori-select" @bind-Value="_formularioIncidencia.PuntoAcceso">
+                        @foreach (string punto in PuntosAccesoDisponibles)
+                        {
+                            <option value="@punto">@punto</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="fiori-form-group">
+                <label class="fiori-label" for="descripcionIncidencia">Descripción de hechos observados</label>
+                <InputTextArea id="descripcionIncidencia"
+                               class="fiori-textarea"
+                               maxlength="1800"
+                               placeholder="Detalla lo sucedido en caseta, acciones tomadas y cualquier observación relevante..."
+                               @bind-Value="_formularioIncidencia.Descripcion" />
+                <ValidationMessage For="@(() => _formularioIncidencia.Descripcion)" />
+            </div>
+
+            <div class="fiori-actions-row" style="margin-bottom:1rem;">
+                @if (_ultimoRegistroAccesoId.HasValue)
+                {
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.86rem; cursor:pointer;">
+                        <InputCheckbox @bind-Value="_formularioIncidencia.VincularUltimoRegistro" />
+                        <span>Vincular al registro de acceso #@_ultimoRegistroAccesoId.Value</span>
+                    </label>
+                }
+
+                @if (_evidenciaActual is not null)
+                {
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.86rem; cursor:pointer;">
+                        <InputCheckbox @bind-Value="_formularioIncidencia.AdjuntarEvidenciaActual" />
+                        <span>Adjuntar evidencia fotográfica capturada</span>
+                    </label>
+                }
+            </div>
+
+            <div class="fiori-actions-row" style="margin-bottom:1.15rem;">
+                <button type="submit"
+                        class="fiori-btn fiori-btn--negative"
+                        disabled="@_reportandoIncidencia">
+                    @(_reportandoIncidencia ? "Registrando incidencia..." : "Reportar Incidencia ITIL")
+                </button>
+            </div>
+        </EditForm>
+
+        <h3 class="fiori-card-title" style="font-size:0.96rem; margin-bottom:0.65rem;">Incidencias abiertas recientes</h3>
+
+        @if (_incidenciasAbiertas.Count == 0)
+        {
+            <div class="fiori-empty-state">
+                <p style="margin:0;">No hay incidencias abiertas ni en investigación registradas actualmente.</p>
+            </div>
+        }
+        else
+        {
+            <div class="fiori-table-wrap">
+                <table class="fiori-table">
+                    <thead>
+                        <tr>
+                            <th>Severidad</th>
+                            <th>Título y detalle</th>
+                            <th>Estado</th>
+                            <th>Reportada</th>
+                            <th>Vínculos / Sync</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (Incidencia incidencia in _incidenciasAbiertas.Take(10))
+                        {
+                            <tr>
+                                <td>
+                                    <StatusBadge Text="@ObtenerEtiquetaSeveridad(incidencia.Severidad)"
+                                                 Variant="@ObtenerVarianteSeveridad(incidencia.Severidad)" />
+                                </td>
+                                <td>
+                                    <strong>@incidencia.Titulo</strong>
+                                    <div style="font-size:0.82rem; color:var(--sapSecondaryTextColor);">@incidencia.Descripcion</div>
+                                </td>
+                                <td>
+                                    <StatusBadge Text="@ObtenerEtiquetaEstadoIncidencia(incidencia.Estado)"
+                                                 Variant="@(incidencia.Estado == EstadoIncidencia.EnInvestigacion ? "informative" : "critical")" />
+                                </td>
+                                <td style="white-space:nowrap;">
+                                    <div>@FormatearHoraLocal(incidencia.FechaReporteUtc)</div>
+                                    @if (incidencia.ReportadoPor is not null)
+                                    {
+                                        <div style="font-size:0.78rem; color:var(--sapSecondaryTextColor);">@incidencia.ReportadoPor.NombreCompleto</div>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="fiori-actions-row">
+                                        @if (incidencia.RegistroAccesoId.HasValue)
+                                        {
+                                            <StatusBadge Text="@($"Acceso #{incidencia.RegistroAccesoId.Value}")" Variant="neutral" />
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(incidencia.RutaEvidenciaFoto))
+                                        {
+                                            <StatusBadge Text="Con foto" Variant="informative" />
+                                        }
+                                        <StatusBadge Text="@ObtenerEtiquetaSync(incidencia.EstadoSincronizacion)"
+                                                     Variant="@ObtenerVarianteSync(incidencia.EstadoSincronizacion)" />
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    // Catálogo de puntos de acceso habilitados en el campus UMAD.
+    private static readonly string[] PuntosAccesoDisponibles =
+    {
+        "Caseta Principal",
+        "Acceso Peatonal Norte",
+        "Estacionamiento UMAD",
+        "Acceso Edificio Académico"
+    };
+
+    // Punto de acceso seleccionado por el operador en turno.
+    private string _puntoAcceso = "Caseta Principal";
+
+    // Dirección del movimiento a validar y registrar en caseta.
+    private TipoMovimientoAcceso _tipoMovimiento = TipoMovimientoAcceso.Entrada;
+
+    // Código QR firmado capturado por cámara o pegado manualmente.
+    private string _codigoQrInput = string.Empty;
+
+    // Indica si el componente está recargando incidencias y resumen de cola offline.
+    private bool _cargandoEstado;
+
+    // Indica si el escáner nativo ZXing está activo.
+    private bool _escaneandoQr;
+
+    // Indica si se está ejecutando la validación criptográfica y el registro en SQLite.
+    private bool _validandoAcceso;
+
+    // Indica si se está capturando una fotografía de evidencia con MediaPicker.
+    private bool _capturandoFoto;
+
+    // Indica si se está guardando una incidencia ITIL en SQLite.
+    private bool _reportandoIncidencia;
+
+    // Mensaje de error general seguro mostrado en pantalla.
+    private string? _mensajeErrorGeneral;
+
+    // Aviso contextual devuelto por el escáner de cámara (permiso, cancelación o plataforma sin cámara).
+    private string? _avisoEscaner;
+
+    // Aviso contextual devuelto por la captura de fotografía.
+    private string? _avisoFoto;
+
+    // Mensaje de notificación toast actualmente activo.
+    private string? _toastMensaje;
+
+    // Variante semántica Fiori del toast activo.
+    private string _toastVariante = "informative";
+
+    // Resumen agregado de registros pendientes de sincronización offline.
+    private SyncQueueSummary? _resumenCola;
+
+    // Resultado más reciente de validación y registro en caseta.
+    private ResultadoOperacionCaseta? _resultadoOperacion;
+
+    // Último identificador de registro de acceso persistido para vincular incidencias.
+    private int? _ultimoRegistroAccesoId;
+
+    // Última evidencia fotográfica capturada lista para vincularse a acceso o incidencia.
+    private EvidenciaFotoResult? _evidenciaActual;
+
+    // Data URI base64 para previsualización segura de la fotografía capturada.
+    private string? _evidenciaPreviewDataUri;
+
+    // Formulario reactivo para levantar incidencias ITIL desde caseta.
+    private FormularioIncidenciaModel _formularioIncidencia = new();
+
+    // Lista de incidencias abiertas o en investigación recuperadas de SQLite.
+    private IReadOnlyList<Incidencia> _incidenciasAbiertas = Array.Empty<Incidencia>();
+
+    /// <summary>
+    /// Inicializa la vista de caseta suscribiéndose al cambio reactivo de sesión y cargando el estado operativo local.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    protected override async Task OnInitializedAsync()
+    {
+        SesionActual.OnSesionCambiada += ManejarCambioSesion;
+        await CargarEstadoOperativoAsync();
+    }
+
+    /// <summary>
+    /// Libera la suscripción al evento reactivo de sesión al destruir la vista de caseta.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    public void Dispose()
+    {
+        SesionActual.OnSesionCambiada -= ManejarCambioSesion;
+    }
+
+    /// <summary>
+    /// Actualiza la vista ante cambios de sesión limpiando estados operativos de sesiones previas.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async void ManejarCambioSesion()
+    {
+        await InvokeAsync(async () =>
+        {
+            _resultadoOperacion = null;
+            _ultimoRegistroAccesoId = null;
+            _avisoEscaner = null;
+            _avisoFoto = null;
+            await CargarEstadoOperativoAsync();
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>
+    /// Verifica mediante IAutorizacionRolService que la sesión activa pertenezca a Guardia de Seguridad o Administrador de Accesos.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private bool TieneAccesoCaseta(SesionUsuario sesion)
+    {
+        if (sesion.RolOperativo == RolUsuario.UsuarioComunidad)
+        {
+            return false;
+        }
+
+        return AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.EscanearCodigoQr)
+            || AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.RegistrarEntradaSalida)
+            || (sesion.RolOperativo == RolUsuario.AdministradorAccesos
+                && AutorizacionRol.TienePermiso(sesion.RolOperativo, PermisoSistema.ConsultarHistorialGlobal));
+    }
+
+    /// <summary>
+    /// Consulta el resumen de cola offline e incidencias abiertas desde SQLite para el panel de caseta.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CargarEstadoOperativoAsync()
+    {
+        _cargandoEstado = true;
+        _mensajeErrorGeneral = null;
+
+        try
+        {
+            await DbInitializer.InitializeAsync();
+            SesionUsuario? sesion = SesionActual.SesionActual;
+            if (sesion is null || !TieneAccesoCaseta(sesion))
+            {
+                _incidenciasAbiertas = Array.Empty<Incidencia>();
+                _resumenCola = null;
+                return;
+            }
+
+            _resumenCola = await SyncQueueService.ObtenerResumenColaAsync();
+            _incidenciasAbiertas = await IncidenciaService.ObtenerAbiertasAsync();
+        }
+        catch (Exception)
+        {
+            _mensajeErrorGeneral = "No fue posible consultar el estado operativo de caseta en SQLite.";
+        }
+        finally
+        {
+            _cargandoEstado = false;
+        }
+    }
+
+    /// <summary>
+    /// Lanza el escáner nativo ZXing mediante IQrScannerService y procesa automáticamente el código leído.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task EscanearQrConCamaraAsync()
+    {
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (sesion is null || !TieneAccesoCaseta(sesion))
+        {
+            MostrarToast("No cuentas con autorización para escanear códigos en caseta.", "negative");
+            return;
+        }
+
+        _escaneandoQr = true;
+        _avisoEscaner = null;
+        _mensajeErrorGeneral = null;
+
+        try
+        {
+            QrScanResult resultadoScan = await QrScannerService.EscanearCodigoQrAsync();
+
+            if (resultadoScan.Cancelado)
+            {
+                MostrarToast("Escaneo QR cancelado por el operador.", "informative");
+                return;
+            }
+
+            if (!resultadoScan.Exitoso || string.IsNullOrWhiteSpace(resultadoScan.CodigoEscaneado))
+            {
+                _avisoEscaner = string.IsNullOrWhiteSpace(resultadoScan.MensajeError)
+                    ? "No fue posible leer el código QR con la cámara. Utiliza el campo manual de prueba."
+                    : resultadoScan.MensajeError;
+                MostrarToast("Cámara no disponible o escaneo interrumpido.", "critical");
+                return;
+            }
+
+            _codigoQrInput = resultadoScan.CodigoEscaneado.Trim();
+            await ValidarYRegistrarAccesoAsync();
+        }
+        catch (Exception ex)
+        {
+            _avisoEscaner = $"Error inesperado al invocar el escáner QR: {ex.Message}";
+        }
+        finally
+        {
+            _escaneandoQr = false;
+        }
+    }
+
+    /// <summary>
+    /// Recupera texto del portapapeles del dispositivo para agilizar pruebas manuales de validación sin cámara.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task PegarCodigoDesdePortapapelesAsync()
+    {
+        try
+        {
+            string? texto = await Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard.Default.GetTextAsync();
+            if (string.IsNullOrWhiteSpace(texto))
+            {
+                MostrarToast("El portapapeles no contiene ningún código QR para pegar.", "critical");
+                return;
+            }
+
+            _codigoQrInput = texto.Trim();
+            _avisoEscaner = null;
+            MostrarToast("Código cargado desde el portapapeles. Presiona 'Validar y Registrar Acceso'.", "informative");
+        }
+        catch (Exception)
+        {
+            MostrarToast("No fue posible leer el portapapeles del dispositivo.", "critical");
+        }
+    }
+
+    /// <summary>
+    /// Valida criptográficamente el código QR, registra el movimiento en SQLite offline y obtiene el dictamen de anomalías IA.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task ValidarYRegistrarAccesoAsync()
+    {
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (sesion is null || !TieneAccesoCaseta(sesion))
+        {
+            MostrarToast("No cuentas con autorización para registrar accesos en caseta.", "negative");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_codigoQrInput))
+        {
+            MostrarToast("Escanea o pega primero un código QR firmado.", "critical");
+            return;
+        }
+
+        _validandoAcceso = true;
+        _mensajeErrorGeneral = null;
+
+        try
+        {
+            string codigo = _codigoQrInput.Trim();
+            TokenValidationResult validacion = await TokenAccesoService.ValidarTokenAsync(codigo);
+
+            if (validacion.Token is null || !validacion.PersonaId.HasValue)
+            {
+                EvaluacionAnomaliaResult dictamenForjado = new()
+                {
+                    EsAnomalo = true,
+                    NivelRiesgo = NivelRiesgoAnomalia.Alto,
+                    ReglasActivadas = new[]
+                    {
+                        "El código QR presentado no supera la verificación criptográfica HMAC-SHA256 o no existe en SQLite local."
+                    },
+                    RecomendacionGuardia = "Denegar ingreso de inmediato, solicitar identificación oficial física y levantar incidencia ITIL.",
+                    ProveedorUtilizado = ObtenerEtiquetaModoIa(IaService.ModoActivo),
+                    FechaEvaluacionUtc = DateTime.UtcNow
+                };
+
+                _resultadoOperacion = new ResultadoOperacionCaseta
+                {
+                    Autorizado = false,
+                    TipoMovimiento = _tipoMovimiento,
+                    PuntoAcceso = _puntoAcceso,
+                    FechaHoraUtc = DateTime.UtcNow,
+                    NombrePersona = "No identificado",
+                    RolPersonaTexto = "Sin coincidencia en padrón",
+                    TipoPaseTexto = "Código inválido o alterado",
+                    Motivo = validacion.Motivo,
+                    EstadoSyncTexto = "Rechazo inmediato (no persistido)",
+                    EstadoSyncVariante = "neutral",
+                    EvaluacionAnomalia = dictamenForjado,
+                    SugerirIncidencia = true,
+                    SeveridadSugerida = SeveridadIncidencia.Alta
+                };
+
+                MostrarToast("Acceso denegado: código QR inválido o alterado.", "negative");
+                return;
+            }
+
+            Persona? persona = validacion.Token.Persona;
+            string nombreTitular = persona?.NombreCompleto ?? $"Persona #{validacion.PersonaId.Value}";
+            string? matriculaTitular = persona?.Matricula;
+            string rolTitular = persona is not null ? ObtenerEtiquetaRolInstitucional(persona.Rol) : "Comunidad UMAD";
+            string tipoPaseTexto = validacion.TipoPase.HasValue ? ObtenerEtiquetaTipoPase(validacion.TipoPase.Value) : "Pase digital";
+
+            if (_tipoMovimiento == TipoMovimientoAcceso.Entrada)
+            {
+                RegistroEntradaConAnalisisResult analisisEntrada = await RegistroAccesoService.RegistrarEntradaConEvaluacionIaAsync(
+                    validacion.PersonaId.Value,
+                    validacion.Token.Id,
+                    _puntoAcceso,
+                    sesion.PersonaId,
+                    _evidenciaActual?.RutaRelativa,
+                    _evidenciaActual?.HashSha256);
+
+                RegistroAcceso registro = analisisEntrada.Registro;
+                _ultimoRegistroAccesoId = registro.Id;
+                bool autorizado = registro.Resultado == ResultadoAcceso.Autorizado;
+
+                _resultadoOperacion = new ResultadoOperacionCaseta
+                {
+                    Autorizado = autorizado,
+                    RegistroAccesoId = registro.Id,
+                    TipoMovimiento = TipoMovimientoAcceso.Entrada,
+                    PuntoAcceso = registro.PuntoAcceso,
+                    FechaHoraUtc = registro.FechaHora,
+                    NombrePersona = nombreTitular,
+                    MatriculaPersona = matriculaTitular,
+                    RolPersonaTexto = rolTitular,
+                    TipoPaseTexto = tipoPaseTexto,
+                    Motivo = registro.MotivoResultado ?? validacion.Motivo,
+                    EstadoSyncTexto = ObtenerEtiquetaSync(registro.EstadoSincronizacion),
+                    EstadoSyncVariante = ObtenerVarianteSync(registro.EstadoSincronizacion),
+                    TieneEvidenciaAdjunta = !string.IsNullOrWhiteSpace(registro.RutaEvidenciaFoto),
+                    EvaluacionAnomalia = analisisEntrada.EvaluacionAnomalia,
+                    SugerirIncidencia = analisisEntrada.SugerirLevantarIncidencia || !autorizado,
+                    SeveridadSugerida = autorizado ? analisisEntrada.SeveridadSugerida : SeveridadIncidencia.Alta
+                };
+
+                MostrarToast(
+                    autorizado
+                        ? $"Entrada autorizada para {nombreTitular} y encolada en SQLite."
+                        : $"Entrada denegada para {nombreTitular}. Motivo registrado en auditoría.",
+                    autorizado ? "positive" : "negative");
+            }
+            else
+            {
+                if (!validacion.EsValido)
+                {
+                    EvaluacionAnomaliaResult evalSalidaInvalida = await IaService.EvaluarAnomaliaAccesoAsync(
+                        new ContextoEvaluacionAcceso
+                        {
+                            PersonaId = validacion.PersonaId.Value,
+                            PuntoAcceso = _puntoAcceso,
+                            TipoMovimiento = TipoMovimientoAcceso.Salida,
+                            FechaHoraEventoUtc = DateTime.UtcNow,
+                            TokenAccesoId = validacion.Token.Id,
+                            TokenValido = false,
+                            MotivoValidacionToken = validacion.Motivo
+                        });
+
+                    _resultadoOperacion = new ResultadoOperacionCaseta
+                    {
+                        Autorizado = false,
+                        TipoMovimiento = TipoMovimientoAcceso.Salida,
+                        PuntoAcceso = _puntoAcceso,
+                        FechaHoraUtc = DateTime.UtcNow,
+                        NombrePersona = nombreTitular,
+                        MatriculaPersona = matriculaTitular,
+                        RolPersonaTexto = rolTitular,
+                        TipoPaseTexto = tipoPaseTexto,
+                        Motivo = validacion.Motivo,
+                        EstadoSyncTexto = "Salida no registrada",
+                        EstadoSyncVariante = "neutral",
+                        EvaluacionAnomalia = evalSalidaInvalida,
+                        SugerirIncidencia = true,
+                        SeveridadSugerida = SeveridadIncidencia.Media
+                    };
+
+                    MostrarToast($"Salida rechazada: {validacion.Motivo}", "negative");
+                    return;
+                }
+
+                RegistroAcceso? entradaAbierta = await RegistroAccesoService.ObtenerEntradaAbiertaAsync(validacion.PersonaId.Value);
+                if (entradaAbierta is null)
+                {
+                    EvaluacionAnomaliaResult evalSinEntrada = await IaService.EvaluarAnomaliaAccesoAsync(
+                        new ContextoEvaluacionAcceso
+                        {
+                            PersonaId = validacion.PersonaId.Value,
+                            PuntoAcceso = _puntoAcceso,
+                            TipoMovimiento = TipoMovimientoAcceso.Salida,
+                            FechaHoraEventoUtc = DateTime.UtcNow,
+                            TokenAccesoId = validacion.Token.Id,
+                            TokenValido = true,
+                            MotivoValidacionToken = "Intento de salida sin entrada abierta previa."
+                        });
+
+                    _resultadoOperacion = new ResultadoOperacionCaseta
+                    {
+                        Autorizado = false,
+                        TipoMovimiento = TipoMovimientoAcceso.Salida,
+                        PuntoAcceso = _puntoAcceso,
+                        FechaHoraUtc = DateTime.UtcNow,
+                        NombrePersona = nombreTitular,
+                        MatriculaPersona = matriculaTitular,
+                        RolPersonaTexto = rolTitular,
+                        TipoPaseTexto = tipoPaseTexto,
+                        Motivo = "No existe una entrada abierta previa para esta persona en SQLite; no fue posible vincular la salida.",
+                        EstadoSyncTexto = "Sin registro de salida",
+                        EstadoSyncVariante = "neutral",
+                        EvaluacionAnomalia = evalSinEntrada,
+                        SugerirIncidencia = true,
+                        SeveridadSugerida = SeveridadIncidencia.Media
+                    };
+
+                    MostrarToast("No se encontró una entrada abierta para registrar la salida.", "critical");
+                    return;
+                }
+
+                RegistroAcceso salida = await RegistroAccesoService.RegistrarSalidaAsync(
+                    validacion.PersonaId.Value,
+                    _puntoAcceso,
+                    sesion.PersonaId);
+
+                _ultimoRegistroAccesoId = salida.Id;
+
+                EvaluacionAnomaliaResult evalSalida = await IaService.EvaluarAnomaliaAccesoAsync(
+                    new ContextoEvaluacionAcceso
+                    {
+                        PersonaId = validacion.PersonaId.Value,
+                        PuntoAcceso = salida.PuntoAcceso,
+                        TipoMovimiento = TipoMovimientoAcceso.Salida,
+                        FechaHoraEventoUtc = salida.FechaHora,
+                        TokenAccesoId = salida.TokenAccesoId,
+                        TokenValido = true,
+                        MotivoValidacionToken = salida.MotivoResultado,
+                        RegistroAccesoActualId = salida.Id
+                    });
+
+                _resultadoOperacion = new ResultadoOperacionCaseta
+                {
+                    Autorizado = true,
+                    RegistroAccesoId = salida.Id,
+                    EntradaRelacionadaId = salida.EntradaRelacionadaId,
+                    TipoMovimiento = TipoMovimientoAcceso.Salida,
+                    PuntoAcceso = salida.PuntoAcceso,
+                    FechaHoraUtc = salida.FechaHora,
+                    NombrePersona = nombreTitular,
+                    MatriculaPersona = matriculaTitular,
+                    RolPersonaTexto = rolTitular,
+                    TipoPaseTexto = tipoPaseTexto,
+                    Motivo = salida.MotivoResultado ?? "Salida registrada correctamente.",
+                    EstadoSyncTexto = ObtenerEtiquetaSync(salida.EstadoSincronizacion),
+                    EstadoSyncVariante = ObtenerVarianteSync(salida.EstadoSincronizacion),
+                    EvaluacionAnomalia = evalSalida,
+                    SugerirIncidencia = evalSalida.EsAnomalo,
+                    SeveridadSugerida = evalSalida.NivelRiesgo == NivelRiesgoAnomalia.Alto
+                        ? SeveridadIncidencia.Alta
+                        : SeveridadIncidencia.Media
+                };
+
+                MostrarToast($"Salida registrada para {nombreTitular} y encolada en SQLite.", "positive");
+            }
+
+            _resumenCola = await SyncQueueService.ObtenerResumenColaAsync();
+        }
+        catch (Exception ex)
+        {
+            _mensajeErrorGeneral = $"No fue posible completar el control de acceso: {ex.Message}";
+            MostrarToast("Ocurrió un error al registrar el movimiento.", "negative");
+        }
+        finally
+        {
+            _validandoAcceso = false;
+        }
+    }
+
+    /// <summary>
+    /// Captura una fotografía de evidencia con la cámara nativa y carga su previsualización segura en formato Data URI.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task CapturarFotoEvidenciaAsync()
+    {
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (sesion is null || !TieneAccesoCaseta(sesion))
+        {
+            MostrarToast("No cuentas con autorización para capturar evidencias fotográficas.", "negative");
+            return;
+        }
+
+        _capturandoFoto = true;
+        _avisoFoto = null;
+
+        try
+        {
+            EvidenciaFotoResult resultado = await EvidenciaFotoService.CapturarEvidenciaAsync($"caseta_{DateTime.UtcNow:yyyyMMdd_HHmmss}");
+
+            if (resultado.Cancelado)
+            {
+                MostrarToast("Captura fotográfica cancelada por el operador.", "informative");
+                return;
+            }
+
+            if (!resultado.Exitoso || string.IsNullOrWhiteSpace(resultado.RutaRelativa))
+            {
+                _avisoFoto = string.IsNullOrWhiteSpace(resultado.MensajeError)
+                    ? "No fue posible capturar la fotografía en este dispositivo."
+                    : resultado.MensajeError;
+                MostrarToast("Captura de fotografía no disponible.", "critical");
+                return;
+            }
+
+            _evidenciaActual = resultado;
+            _evidenciaPreviewDataUri = await AccesoConsultaService.LeerEvidenciaFotoDataUriAsync(resultado.RutaRelativa);
+            _formularioIncidencia.AdjuntarEvidenciaActual = true;
+            MostrarToast("Evidencia fotográfica guardada con integridad SHA-256.", "positive");
+        }
+        catch (Exception ex)
+        {
+            _avisoFoto = $"Error inesperado al capturar evidencia: {ex.Message}";
+        }
+        finally
+        {
+            _capturandoFoto = false;
+        }
+    }
+
+    /// <summary>
+    /// Limpia la evidencia fotográfica capturada en memoria para la sesión de captura actual.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void LimpiarEvidenciaActual()
+    {
+        _evidenciaActual = null;
+        _evidenciaPreviewDataUri = null;
+        _avisoFoto = null;
+        _formularioIncidencia.AdjuntarEvidenciaActual = false;
+        MostrarToast("Evidencia fotográfica desvinculada del formulario actual.", "informative");
+    }
+
+    /// <summary>
+    /// Limpia el campo de código QR y la tarjeta de resultado en vivo para preparar el siguiente turno de lectura.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void LimpiarValidacionActual()
+    {
+        _codigoQrInput = string.Empty;
+        _resultadoOperacion = null;
+        _avisoEscaner = null;
+        _mensajeErrorGeneral = null;
+    }
+
+    /// <summary>
+    /// Precarga el formulario de incidencias ITIL con la información del último acceso denegado o alerta de anomalía IA.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void PrellenarIncidenciaDesdeResultado()
+    {
+        if (_resultadoOperacion is null)
+        {
+            return;
+        }
+
+        string reglas = _resultadoOperacion.EvaluacionAnomalia?.ReglasActivadas.Count > 0
+            ? string.Join(" | ", _resultadoOperacion.EvaluacionAnomalia.ReglasActivadas)
+            : "Sin reglas adicionales.";
+
+        _formularioIncidencia = new FormularioIncidenciaModel
+        {
+            Titulo = _resultadoOperacion.Autorizado
+                ? $"Alerta de anomalía IA en {_resultadoOperacion.PuntoAcceso}"
+                : $"Acceso denegado en {_resultadoOperacion.PuntoAcceso} ({_resultadoOperacion.NombrePersona})",
+            Severidad = _resultadoOperacion.SeveridadSugerida,
+            PuntoAcceso = _resultadoOperacion.PuntoAcceso,
+            Descripcion = $"Titular: {_resultadoOperacion.NombrePersona}. Motivo: {_resultadoOperacion.Motivo}. Hallazgos IA: {reglas}",
+            VincularUltimoRegistro = _resultadoOperacion.RegistroAccesoId.HasValue,
+            AdjuntarEvidenciaActual = _evidenciaActual is not null
+        };
+
+        MostrarToast("Formulario de incidencia ITIL prellenado con la alerta detectada.", "informative");
+    }
+
+    /// <summary>
+    /// Registra una nueva incidencia operativa ITIL en SQLite y refresca el listado de incidencias abiertas.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private async Task ReportarIncidenciaAsync()
+    {
+        SesionUsuario? sesion = SesionActual.SesionActual;
+        if (sesion is null || !TieneAccesoCaseta(sesion))
+        {
+            MostrarToast("No cuentas con autorización para reportar incidencias.", "negative");
+            return;
+        }
+
+        _reportandoIncidencia = true;
+        _mensajeErrorGeneral = null;
+
+        try
+        {
+            string descripcionCompleta = $"[Punto: {_formularioIncidencia.PuntoAcceso}] {_formularioIncidencia.Descripcion.Trim()}";
+            int? registroVinculado = _formularioIncidencia.VincularUltimoRegistro ? _ultimoRegistroAccesoId : null;
+            string? rutaFoto = _formularioIncidencia.AdjuntarEvidenciaActual ? _evidenciaActual?.RutaRelativa : null;
+            string? hashFoto = _formularioIncidencia.AdjuntarEvidenciaActual ? _evidenciaActual?.HashSha256 : null;
+
+            await IncidenciaService.ReportarIncidenciaAsync(
+                sesion.PersonaId,
+                _formularioIncidencia.Severidad,
+                _formularioIncidencia.Titulo,
+                descripcionCompleta,
+                registroVinculado,
+                rutaFoto,
+                hashFoto);
+
+            _formularioIncidencia = new FormularioIncidenciaModel
+            {
+                PuntoAcceso = _puntoAcceso
+            };
+
+            _incidenciasAbiertas = await IncidenciaService.ObtenerAbiertasAsync();
+            _resumenCola = await SyncQueueService.ObtenerResumenColaAsync();
+            MostrarToast("Incidencia ITIL registrada en SQLite y encolada para seguimiento.", "positive");
+        }
+        catch (Exception ex)
+        {
+            _mensajeErrorGeneral = $"No fue posible reportar la incidencia: {ex.Message}";
+            MostrarToast("Verifica los campos de la incidencia e intenta nuevamente.", "negative");
+        }
+        finally
+        {
+            _reportandoIncidencia = false;
+        }
+    }
+
+    /// <summary>
+    /// Activa una notificación toast con la variante semántica SAP Fiori especificada.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void MostrarToast(string mensaje, string variante)
+    {
+        _toastMensaje = mensaje;
+        _toastVariante = variante;
+    }
+
+    /// <summary>
+    /// Descarta el toast informativo mostrado en pantalla.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void CerrarToast()
+    {
+        _toastMensaje = null;
+    }
+
+    /// <summary>
+    /// Construye el estilo visual semántico de la tarjeta de resultado en vivo según si el acceso fue autorizado o denegado.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEstiloTarjetaResultado(bool autorizado) => autorizado
+        ? "margin-top:1.15rem; margin-bottom:0; border-left:5px solid var(--sapPositiveColor); background-color:var(--sapPositiveBackground);"
+        : "margin-top:1.15rem; margin-bottom:0; border-left:5px solid var(--sapNegativeColor); background-color:var(--sapNegativeBackground);";
+
+    /// <summary>
+    /// Construye el estilo semántico de color para el encabezado de la tarjeta de resultado en vivo.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEstiloTituloResultado(bool autorizado) => autorizado
+        ? "color:var(--sapPositiveColor);"
+        : "color:var(--sapNegativeColor);";
+
+    /// <summary>
+    /// Acorta el hash SHA-256 de la fotografía para mostrar una huella verificable sin saturar la interfaz.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ResumirHash(string? hash)
+    {
+        if (string.IsNullOrWhiteSpace(hash))
+        {
+            return "No disponible";
+        }
+
+        return hash.Length <= 20 ? hash : $"{hash[..12]}…{hash[^8..]}";
+    }
+
+    /// <summary>
+    /// Traduce el rol operativo RBAC a su denominación legible en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRol(RolUsuario rol) => rol switch
+    {
+        RolUsuario.UsuarioComunidad => "Comunidad UMAD",
+        RolUsuario.GuardiaSeguridad => "Guardia de Seguridad",
+        RolUsuario.AdministradorAccesos => "Administrador de Accesos",
+        _ => "Sin rol"
+    };
+
+    /// <summary>
+    /// Traduce el rol institucional de una persona a texto legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRolInstitucional(RolPersona rol) => rol switch
+    {
+        RolPersona.Estudiante => "Estudiante",
+        RolPersona.Docente => "Docente",
+        RolPersona.Administrativo => "Administrativo",
+        RolPersona.Visitante => "Visitante",
+        RolPersona.Guardia => "Guardia",
+        RolPersona.Administrador => "Administrador",
+        _ => rol.ToString()
+    };
+
+    /// <summary>
+    /// Traduce el tipo de pase institucional a su etiqueta legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaTipoPase(TipoPase tipo) => tipo switch
+    {
+        TipoPase.Permanente => "Pase Permanente",
+        TipoPase.Temporal => "Pase Temporal",
+        TipoPase.Visitante => "Pase Visitante",
+        TipoPase.Evento => "Pase de Evento",
+        _ => tipo.ToString()
+    };
+
+    /// <summary>
+    /// Traduce el modo activo del proveedor de IA a texto legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaModoIa(ModoProveedorIa modo) => modo switch
+    {
+        ModoProveedorIa.OfflineLocal => "Local Offline",
+        ModoProveedorIa.AzureAiProduction => "Azure AI Producción",
+        _ => modo.ToString()
+    };
+
+    /// <summary>
+    /// Traduce el nivel de riesgo de anomalía a texto en español.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaRiesgo(NivelRiesgoAnomalia nivel) => nivel switch
+    {
+        NivelRiesgoAnomalia.Alto => "Alto",
+        NivelRiesgoAnomalia.Medio => "Medio",
+        _ => "Bajo"
+    };
+
+    /// <summary>
+    /// Resuelve la variante Fiori del badge según el nivel de riesgo detectado por IA.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteRiesgo(NivelRiesgoAnomalia nivel) => nivel switch
+    {
+        NivelRiesgoAnomalia.Alto => "negative",
+        NivelRiesgoAnomalia.Medio => "critical",
+        _ => "positive"
+    };
+
+    /// <summary>
+    /// Traduce la severidad ITIL de una incidencia a texto legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaSeveridad(SeveridadIncidencia severidad) => severidad switch
+    {
+        SeveridadIncidencia.Critica => "Crítica",
+        SeveridadIncidencia.Alta => "Alta",
+        SeveridadIncidencia.Media => "Media",
+        _ => "Baja"
+    };
+
+    /// <summary>
+    /// Resuelve la variante Fiori del badge de severidad ITIL.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteSeveridad(SeveridadIncidencia severidad) => severidad switch
+    {
+        SeveridadIncidencia.Critica => "negative",
+        SeveridadIncidencia.Alta => "negative",
+        SeveridadIncidencia.Media => "critical",
+        _ => "informative"
+    };
+
+    /// <summary>
+    /// Traduce el estado del ciclo de atención de una incidencia ITIL a texto legible.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaEstadoIncidencia(EstadoIncidencia estado) => estado switch
+    {
+        EstadoIncidencia.Abierta => "Abierta",
+        EstadoIncidencia.EnInvestigacion => "En investigación",
+        EstadoIncidencia.Resuelta => "Resuelta",
+        EstadoIncidencia.Cerrada => "Cerrada",
+        _ => estado.ToString()
+    };
+
+    /// <summary>
+    /// Traduce el estado de sincronización offline a una etiqueta breve.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerEtiquetaSync(EstadoSincronizacion estado) => estado switch
+    {
+        EstadoSincronizacion.Sincronizado => "Sincronizado",
+        EstadoSincronizacion.Error => "Error de sync",
+        _ => "Pendiente de sync"
+    };
+
+    /// <summary>
+    /// Resuelve la variante visual Fiori del estado de sincronización offline.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ObtenerVarianteSync(EstadoSincronizacion estado) => estado switch
+    {
+        EstadoSincronizacion.Sincronizado => "positive",
+        EstadoSincronizacion.Error => "negative",
+        _ => "critical"
+    };
+
+    /// <summary>
+    /// Convierte una fecha UTC a la zona horaria local America/Mexico_City para mostrarla al operador.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string FormatearHoraLocal(DateTime fechaUtc)
+    {
+        DateTime normalizada = fechaUtc.Kind switch
+        {
+            DateTimeKind.Utc => fechaUtc,
+            DateTimeKind.Local => fechaUtc.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(fechaUtc, DateTimeKind.Utc)
+        };
+
+        TimeZoneInfo zona;
+        try
+        {
+            zona = TimeZoneInfo.FindSystemTimeZoneById("America/Mexico_City");
+        }
+        catch (Exception)
+        {
+            zona = TimeZoneInfo.Local;
+        }
+
+        return TimeZoneInfo.ConvertTimeFromUtc(normalizada, zona).ToString("dd/MM/yyyy HH:mm");
+    }
+
+    /// <summary>
+    /// Agrupa el detalle completo mostrado en la tarjeta de resultado en vivo tras validar un QR en caseta.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private sealed class ResultadoOperacionCaseta
+    {
+        // Indica si el acceso fue autorizado o denegado.
+        public bool Autorizado { get; init; }
+
+        // Identificador del registro persistido en SQLite cuando existió titular válido.
+        public int? RegistroAccesoId { get; init; }
+
+        // Identificador de la entrada abierta vinculada cuando se registró una salida.
+        public int? EntradaRelacionadaId { get; init; }
+
+        // Dirección del movimiento evaluado en caseta.
+        public TipoMovimientoAcceso TipoMovimiento { get; init; }
+
+        // Punto de acceso donde se realizó la validación.
+        public string PuntoAcceso { get; init; } = string.Empty;
+
+        // Fecha y hora UTC exacta de la operación.
+        public DateTime FechaHoraUtc { get; init; } = DateTime.UtcNow;
+
+        // Nombre completo del titular asociado al pase.
+        public string NombrePersona { get; init; } = string.Empty;
+
+        // Matrícula institucional del titular cuando aplica.
+        public string? MatriculaPersona { get; init; }
+
+        // Etiqueta del rol institucional del titular.
+        public string RolPersonaTexto { get; init; } = string.Empty;
+
+        // Etiqueta de la modalidad de pase validada.
+        public string TipoPaseTexto { get; init; } = string.Empty;
+
+        // Motivo exacto de autorización o rechazo devuelto por el servicio.
+        public string Motivo { get; init; } = string.Empty;
+
+        // Etiqueta del estado de sincronización offline del registro.
+        public string EstadoSyncTexto { get; init; } = "Pendiente de sync";
+
+        // Variante visual Fiori asociada al estado de sincronización.
+        public string EstadoSyncVariante { get; init; } = "critical";
+
+        // Indica si se adjuntó evidencia fotográfica al registro persistido.
+        public bool TieneEvidenciaAdjunta { get; init; }
+
+        // Resultado de la evaluación de anomalías IA asociada al intento.
+        public EvaluacionAnomaliaResult? EvaluacionAnomalia { get; init; }
+
+        // Indica si se recomienda escalar el evento a una incidencia ITIL.
+        public bool SugerirIncidencia { get; init; }
+
+        // Severidad ITIL recomendada en caso de prellenar una incidencia.
+        public SeveridadIncidencia SeveridadSugerida { get; init; } = SeveridadIncidencia.Baja;
+    }
+
+    /// <summary>
+    /// Encapsula los campos validables del formulario rápido de incidencias ITIL en caseta.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private sealed class FormularioIncidenciaModel
+    {
+        // Título breve y obligatorio de la incidencia reportada.
+        [Required(ErrorMessage = "El título de la incidencia es obligatorio.")]
+        [StringLength(200, MinimumLength = 5, ErrorMessage = "Ingresa un título entre 5 y 200 caracteres.")]
+        public string Titulo { get; set; } = string.Empty;
+
+        // Nivel de severidad ITIL asignado al reporte.
+        public SeveridadIncidencia Severidad { get; set; } = SeveridadIncidencia.Media;
+
+        // Punto de acceso donde ocurrió la incidencia.
+        public string PuntoAcceso { get; set; } = "Caseta Principal";
+
+        // Descripción detallada de los hechos observados en caseta.
+        [Required(ErrorMessage = "La descripción de la incidencia es obligatoria.")]
+        [StringLength(1800, MinimumLength = 10, ErrorMessage = "Describe los hechos con entre 10 y 1800 caracteres.")]
+        public string Descripcion { get; set; } = string.Empty;
+
+        // Indica si se debe vincular el reporte al último registro de acceso generado en la vista.
+        public bool VincularUltimoRegistro { get; set; } = true;
+
+        // Indica si se debe adjuntar la evidencia fotográfica actualmente capturada.
+        public bool AdjuntarEvidenciaActual { get; set; } = true;
+    }
+}

@@ -65,6 +65,7 @@ namespace UMADAccesos.Extensions
             services.AddScoped<IRenovacionService, RenovacionService>();
             services.AddScoped<IIncidenciaService, IncidenciaService>();
             services.AddScoped<IAccesoConsultaService, AccesoConsultaService>();
+            services.AddScoped<IGestionUsuariosService, GestionUsuariosService>();
 
             return services;
         }

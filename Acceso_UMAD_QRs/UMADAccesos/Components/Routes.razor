@@ -5,9 +5,25 @@
     </Found>
     <NotFound>
         <LayoutView Layout="@typeof(MainLayout)">
-            <section class="diag-card">
-                <h2>Ruta no encontrada</h2>
-                <p>La vista solicitada no está disponible en la fase actual.</p>
+            <section class="fiori-card">
+                <div class="fiori-header">
+                    <div>
+                        <h1 class="fiori-page-title">Ruta no encontrada</h1>
+                        <p class="fiori-page-subtitle">
+                            La dirección solicitada no existe o no se encuentra disponible dentro de UMAD Accesos v2.0.
+                        </p>
+                    </div>
+                    <StatusBadge Text="404 · No disponible" Variant="critical" />
+                </div>
+
+                <div class="fiori-alert fiori-alert-warning">
+                    Verifica la ruta seleccionada en el menú lateral o regresa al panel principal institucional.
+                </div>
+
+                <div class="fiori-actions">
+                    <a href="/" class="fiori-btn fiori-btn--emphasized">Volver al inicio</a>
+                    <a href="/login" class="fiori-btn fiori-btn--standard">Ir a inicio de sesión</a>
+                </div>
             </section>
         </LayoutView>
     </NotFound>

@@ -1,0 +1,190 @@
+@using System.Globalization
+@using System.Text
+@using ZXing
+@using ZXing.Common
+@using ZXing.QrCode
+@using ZXing.QrCode.Internal
+
+@if (!string.IsNullOrWhiteSpace(_svgPathData) && _matrizAncho > 0 && _matrizAlto > 0)
+{
+    <svg xmlns="http://www.w3.org/2000/svg"
+         viewBox="0 0 @_matrizAncho @_matrizAlto"
+         width="@_tamanoEfectivo"
+         height="@_tamanoEfectivo"
+         role="img"
+         aria-label="@_etiquetaAccesible"
+         shape-rendering="crispEdges"
+         style="display:block; max-width:100%; height:auto; background:#FFFFFF;">
+        <rect width="@_matrizAncho" height="@_matrizAlto" fill="#FFFFFF" />
+        <path d="@_svgPathData" fill="#000000" />
+    </svg>
+}
+else
+{
+    <div class="fiori-empty-state"
+         role="img"
+         aria-label="@_etiquetaAccesible"
+         style="width:@($"{_tamanoEfectivo}px"); max-width:100%; padding:1.25rem;">
+        <p style="margin:0; font-size:0.86rem; font-weight:600;">
+            @(_mensajeFallback ?? "Sin código QR disponible para mostrar.")
+        </p>
+    </div>
+}
+
+@code {
+    // Tamaño mínimo permitido en píxeles para preservar la legibilidad al escanear.
+    private const int TamanoMinimoPx = 120;
+
+    // Tamaño máximo permitido en píxeles para evitar desbordes de diseño.
+    private const int TamanoMaximoPx = 480;
+
+    // Margen de zona silenciosa estándar de 4 módulos recomendada por la especificación QR.
+    private const int MargenZonaSilenciosa = 4;
+
+    // Último contenido codificado para evitar recomputar la matriz si no cambió el parámetro.
+    private string? _ultimoPayloadGenerado;
+
+    // Ruta vectorial SVG que agrupa los módulos oscuros del código QR.
+    private string? _svgPathData;
+
+    // Ancho total de la matriz QR en módulos incluyendo la zona silenciosa.
+    private int _matrizAncho;
+
+    // Alto total de la matriz QR en módulos incluyendo la zona silenciosa.
+    private int _matrizAlto;
+
+    // Tamaño final acotado en píxeles aplicado al elemento SVG.
+    private int _tamanoEfectivo = 220;
+
+    // Etiqueta accesible normalizada para lectores de pantalla.
+    private string _etiquetaAccesible = "Código QR de acceso";
+
+    // Mensaje defensivo mostrado si el payload está vacío o no pudo codificarse.
+    private string? _mensajeFallback;
+
+    // Cadena firmada o carga útil que se codificará dentro del código QR vectorial.
+    [Parameter]
+    public string? Payload { get; set; }
+
+    // Dimensión cuadrada en píxeles solicitada para renderizar el código QR.
+    [Parameter]
+    public int Size { get; set; } = 220;
+
+    // Descripción accesible anunciada por tecnologías de asistencia.
+    [Parameter]
+    public string AriaLabel { get; set; } = "Código QR de acceso";
+
+    /// <summary>
+    /// Normaliza los parámetros del componente y regenera la matriz QR en formato SVG cuando cambia la carga útil.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    protected override void OnParametersSet()
+    {
+        _tamanoEfectivo = Math.Clamp(Size, TamanoMinimoPx, TamanoMaximoPx);
+        _etiquetaAccesible = string.IsNullOrWhiteSpace(AriaLabel)
+            ? "Código QR de acceso"
+            : AriaLabel.Trim();
+
+        string? payloadNormalizado = string.IsNullOrWhiteSpace(Payload)
+            ? null
+            : Payload.Trim();
+
+        if (string.Equals(payloadNormalizado, _ultimoPayloadGenerado, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _ultimoPayloadGenerado = payloadNormalizado;
+        GenerarMatrizSvg(payloadNormalizado);
+    }
+
+    /// <summary>
+    /// Codifica la carga útil mediante ZXing QRCodeWriter y construye un trazado SVG nítido por segmentos horizontales.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private void GenerarMatrizSvg(string? payloadNormalizado)
+    {
+        _svgPathData = null;
+        _matrizAncho = 0;
+        _matrizAlto = 0;
+        _mensajeFallback = null;
+
+        if (string.IsNullOrEmpty(payloadNormalizado))
+        {
+            _mensajeFallback = "No hay un código QR activo disponible.";
+            return;
+        }
+
+        try
+        {
+            QRCodeWriter writer = new();
+            Dictionary<EncodeHintType, object> hints = new()
+            {
+                [EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.M,
+                [EncodeHintType.MARGIN] = MargenZonaSilenciosa,
+                [EncodeHintType.CHARACTER_SET] = "UTF-8"
+            };
+
+            BitMatrix matrix = writer.encode(payloadNormalizado, BarcodeFormat.QR_CODE, 1, 1, hints);
+            _matrizAncho = matrix.Width;
+            _matrizAlto = matrix.Height;
+            _svgPathData = ConstruirTrazadoSvg(matrix);
+        }
+        catch (Exception)
+        {
+            _mensajeFallback = "No fue posible generar la representación visual del código QR.";
+        }
+    }
+
+    /// <summary>
+    /// Convierte una instancia de BitMatrix en un atributo path SVG compacto unificando módulos oscuros contiguos por fila.
+    /// </summary>
+    /// <author>Emmanuel Baltazar López</author>
+    /// <date>25/11/2026</date>
+    /// <version>1.0</version>
+    /// <modification>25/11/2026</modification>
+    private static string ConstruirTrazadoSvg(BitMatrix matrix)
+    {
+        StringBuilder sb = new(matrix.Width * matrix.Height);
+        int ancho = matrix.Width;
+        int alto = matrix.Height;
+
+        for (int y = 0; y < alto; y++)
+        {
+            int x = 0;
+            while (x < ancho)
+            {
+                if (!matrix[x, y])
+                {
+                    x++;
+                    continue;
+                }
+
+                int inicio = x;
+                while (x < ancho && matrix[x, y])
+                {
+                    x++;
+                }
+
+                int longitud = x - inicio;
+                sb.Append('M')
+                  .Append(inicio.ToString(CultureInfo.InvariantCulture))
+                  .Append(' ')
+                  .Append(y.ToString(CultureInfo.InvariantCulture))
+                  .Append('h')
+                  .Append(longitud.ToString(CultureInfo.InvariantCulture))
+                  .Append("v1h-")
+                  .Append(longitud.ToString(CultureInfo.InvariantCulture))
+                  .Append('z');
+            }
+        }
+
+        return sb.ToString();
+    }
+}
